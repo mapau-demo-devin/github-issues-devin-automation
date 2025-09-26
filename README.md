@@ -14,6 +14,7 @@ A CLI tool that integrates GitHub Issues with Devin AI to automate issue scoping
 ```bash
 pip install -r requirements.txt
 ```
+   **Note**: This includes the `inquirer` library for interactive arrow key navigation.
 
 2. Set up environment variables:
 ```bash
@@ -74,6 +75,10 @@ Get Devin AI to analyze issue complexity and provide estimates:
 # Analyze a specific issue
 python cli.py scope-issue --repo microsoft/vscode --issue-number 123
 
+# Interactive issue selection (new!)
+python cli.py scope-issue --repo microsoft/vscode
+# Use arrow keys to navigate, Enter to select
+
 # Example output:
 # Scoping issue #123: Add dark mode support
 # Created Devin session: devin-abc123...
@@ -86,6 +91,10 @@ Have Devin AI implement solutions for GitHub issues:
 ```bash
 # Implement a solution for an issue
 python cli.py complete-issue --repo your-org/your-repo --issue-number 456
+
+# Interactive issue selection (new!)
+python cli.py complete-issue --repo your-org/your-repo
+# Use arrow keys to navigate, Enter to select
 
 # Example output:
 # Completing issue #456: Fix login validation bug

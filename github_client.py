@@ -18,7 +18,7 @@ class GitHubClient:
             'Accept': 'application/vnd.github.v3+json'
         }
     
-    def list_issues(self, repo: str, state: str = 'open', limit: int = 10) -> List[Dict[Any, Any]]:
+    def list_issues(self, repo: str, state: str = 'open', limit: int = 10, return_headers: bool = False):
         """
         List issues from a GitHub repository.
         
@@ -26,9 +26,10 @@ class GitHubClient:
             repo: Repository in format 'owner/repo'
             state: Issue state ('open', 'closed', 'all')
             limit: Maximum number of issues to return
+            return_headers: If True, return (issues, headers) tuple
         
         Returns:
-            List of issue dictionaries
+            List of issue dictionaries, or tuple of (issues, headers) if return_headers=True
         """
         url = f"{self.base_url}/repos/{repo}/issues"
         params = {
@@ -41,6 +42,8 @@ class GitHubClient:
         response = requests.get(url, headers=self.headers, params=params)
         response.raise_for_status()
         
+        if return_headers:
+            return response.json(), dict(response.headers)
         return response.json()
     
     def get_issue(self, repo: str, issue_number: int) -> Dict[Any, Any]:
@@ -77,3 +80,18 @@ class GitHubClient:
         response.raise_for_status()
         
         return response.json()
+    
+    def has_many_issues(self, repo: str, threshold: int = 10, state: str = 'open') -> bool:
+        """
+        Check if repository has more than threshold number of issues.
+        
+        Args:
+            repo: Repository in format 'owner/repo'
+            threshold: Number to check against
+            state: Issue state ('open', 'closed', 'all')
+        
+        Returns:
+            True if repo has more than threshold issues
+        """
+        issues, headers = self.list_issues(repo, state=state, limit=threshold + 1, return_headers=True)
+        return len(issues) > threshold or ('link' in headers and 'rel="next"' in headers['link'])
