@@ -61,25 +61,47 @@ def cli():
 @click.option('--repo', required=True, help='Repository in format owner/repo')
 @click.option('--state', default='open', help='Issue state (open, closed, all)')
 @click.option('--limit', default=10, help='Maximum number of issues to display')
-def list_issues(repo, state, limit):
+@click.option('--tag', help='Filter by label/tag (comma-separated for multiple)')
+@click.option('--priority', help='Filter by priority label (high, medium, low)')
+def list_issues(repo, state, limit, tag, priority):
     """List GitHub issues from a repository"""
     github_client = GitHubClient()
     
     try:
-        issues = github_client.list_issues(repo, state=state, limit=limit)
+        labels = []
+        if tag:
+            labels.extend(tag.split(','))
+        if priority:
+            labels.append(priority)
         
-        table = Table(title=f"Issues from {repo}")
+        labels_param = ','.join(labels) if labels else None
+        issues = github_client.list_issues(repo, state=state, limit=limit, labels=labels_param)
+        
+        filter_info = []
+        if tag:
+            filter_info.append(f"tags: {tag}")
+        if priority:
+            filter_info.append(f"priority: {priority}")
+        
+        title = f"Issues from {repo}"
+        if filter_info:
+            title += f" (filtered by {', '.join(filter_info)})"
+        
+        table = Table(title=title)
         table.add_column("Number", style="cyan")
         table.add_column("Title", style="white")
         table.add_column("State", style="green")
         table.add_column("Author", style="yellow")
+        table.add_column("Labels", style="magenta")
         
         for issue in issues:
+            labels_text = ', '.join([label['name'] for label in issue.get('labels', [])])
             table.add_row(
                 str(issue['number']),
                 issue['title'][:50] + "..." if len(issue['title']) > 50 else issue['title'],
                 issue['state'],
-                issue['user']['login']
+                issue['user']['login'],
+                labels_text[:30] + "..." if len(labels_text) > 30 else labels_text
             )
         
         console.print(table)
