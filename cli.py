@@ -273,7 +273,10 @@ def explain_confidence_score(score, factors):
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
 @click.option('--issue-number', type=int, help='Issue number to scope (optional - will prompt if not provided)')
-def scope_issue(repo, issue_number):
+@click.option('--label', help='Filter by label names (comma-separated for multiple)')
+@click.option('--milestone', help='Filter by milestone (number, "*" for any, "none" for none)')
+@click.option('--assignee', help='Filter by assignee (username, "*" for any, "none" for unassigned)')
+def scope_issue(repo, issue_number, label, milestone, assignee):
     """Analyze issue complexity and provide confidence score"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
@@ -290,7 +293,7 @@ def scope_issue(repo, issue_number):
     
     if issue_number is None:
         try:
-            issue_number = select_issue_interactively(github_client, repo)
+            issue_number = select_issue_interactively(github_client, repo, labels=label, milestone=milestone, assignee=assignee)
         except click.ClickException as e:
             console.print(f"[red]Error: {e}[/red]")
             return
@@ -366,7 +369,10 @@ def scope_issue(repo, issue_number):
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
 @click.option('--issue-number', type=int, help='Issue number to complete (optional - will prompt if not provided)')
-def complete_issue(repo, issue_number):
+@click.option('--label', help='Filter by label names (comma-separated for multiple)')
+@click.option('--milestone', help='Filter by milestone (number, "*" for any, "none" for none)')
+@click.option('--assignee', help='Filter by assignee (username, "*" for any, "none" for unassigned)')
+def complete_issue(repo, issue_number, label, milestone, assignee):
     """Complete an issue using Devin AI"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
@@ -384,7 +390,7 @@ def complete_issue(repo, issue_number):
     
     if issue_number is None:
         try:
-            issue_number = select_issue_interactively(github_client, repo)
+            issue_number = select_issue_interactively(github_client, repo, labels=label, milestone=milestone, assignee=assignee)
         except click.ClickException as e:
             console.print(f"[red]Error: {e}[/red]")
             return
