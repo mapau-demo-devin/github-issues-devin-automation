@@ -8,6 +8,13 @@ A CLI tool that integrates GitHub Issues with Devin AI to automate issue scoping
 - **Scope Issues**: Trigger Devin sessions to analyze issues and assign confidence scores
 - **Complete Issues**: Trigger Devin sessions to implement solutions based on action plans
 
+## System Requirements
+
+- Python 3.7+
+- OpenSSL 1.1.1+ or compatible SSL library
+
+**Note**: If you encounter urllib3 warnings about LibreSSL compatibility, the requirements.txt file pins urllib3 to v1.x to avoid this issue.
+
 ## Setup
 
 1. Install dependencies:
@@ -157,3 +164,12 @@ python cli.py scope-issue --repo owner/repo --issue-number 2
 **Authentication Errors**: Verify your tokens have the correct permissions:
 - GitHub token needs `repo` scope for private repositories
 - Devin API key must be valid and active
+
+**urllib3 SSL Warnings**: If you see warnings about urllib3 v2 and LibreSSL compatibility:
+```
+/path/to/python/lib/python3.x/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'
+```
+This is resolved by the urllib3 version constraint in requirements.txt. Reinstall dependencies:
+```bash
+pip install -r requirements.txt --force-reinstall
+```
