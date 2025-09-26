@@ -8,6 +8,7 @@ A command-line tool for integrating GitHub Issues with Devin AI.
 import os
 import re
 import click
+import requests
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
@@ -19,6 +20,36 @@ from devin_client import DevinClient
 
 load_dotenv()
 console = Console()
+
+def validate_repo_format(repo: str) -> bool:
+    """Validate repository format (owner/repo)"""
+    pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?/[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$'
+    return bool(re.match(pattern, repo))
+
+def validate_issue_number(issue_number: int) -> bool:
+    """Validate issue number is positive
+    
+    Note: GitHub API has no separate endpoint to pre-validate issue numbers.
+    This basic validation catches obvious invalid inputs before making API calls.
+    """
+    return issue_number > 0
+
+def validate_repository_exists(github_client: GitHubClient, repo: str) -> tuple[bool, str]:
+    """Check if repository exists and is accessible"""
+    try:
+        github_client.get_repository(repo)
+        return True, ""
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            return False, f"Repository '{repo}' not found or not accessible"
+        elif e.response.status_code == 403:
+            return False, f"Access denied to repository '{repo}'. Check your GitHub token permissions"
+        elif e.response.status_code == 401:
+            return False, f"Authentication failed. Check your GITHUB_TOKEN environment variable"
+        else:
+            return False, f"Error accessing repository '{repo}': {e}"
+    except Exception as e:
+        return False, f"Error accessing repository '{repo}': {e}"
 
 @click.group()
 def cli():
@@ -157,7 +188,23 @@ def explain_confidence_score(score, factors):
 @click.option('--issue-number', required=True, type=int, help='Issue number to scope')
 def scope_issue(repo, issue_number):
     """Analyze issue complexity and provide confidence score"""
+    if not validate_repo_format(repo):
+        console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
+        console.print(f"[yellow]Expected format: owner/repo (e.g., 'mapau-demo-devin/running-buddy')[/yellow]")
+        return
+    
+    if not validate_issue_number(issue_number):
+        console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
+        console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
+        return
+    
     github_client = GitHubClient()
+    
+    repo_exists, repo_error = validate_repository_exists(github_client, repo)
+    if not repo_exists:
+        console.print(f"[red]Error: {repo_error}[/red]")
+        console.print(f"[yellow]Tip: Verify the repository name and your access permissions[/yellow]")
+        return
     
     try:
         issue = github_client.get_issue(repo, issue_number)
@@ -207,6 +254,18 @@ def scope_issue(repo, issue_number):
         else:
             console.print("[dim]Skipping Devin session creation.[/dim]")
         
+    except requests.exceptions.HTTPError as e:
+        # Note: After pre-flight repository validation passes, we assume 404 errors
+        # from get_issue() indicate non-existent issues. However, edge cases exist:
+        # - Different permissions (repo accessible but not specific issues)
+        # - Timing issues (repo moved/renamed between repo check and issue check)
+        # - API inconsistencies or temporary GitHub API issues
+        # - Private issues visible only to certain users
+        if e.response.status_code == 404:
+            console.print(f"[red]Error: Issue #{issue_number} not found in repository {repo}[/red]")
+            console.print(f"[yellow]Tip: Use 'list-issues --repo {repo}' to see available issues[/yellow]")
+        else:
+            console.print(f"[red]HTTP Error: {e}[/red]")
     except Exception as e:
         console.print(f"[red]Error scoping issue: {e}[/red]")
 
@@ -215,8 +274,24 @@ def scope_issue(repo, issue_number):
 @click.option('--issue-number', required=True, type=int, help='Issue number to complete')
 def complete_issue(repo, issue_number):
     """Complete an issue using Devin AI"""
+    if not validate_repo_format(repo):
+        console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
+        console.print(f"[yellow]Expected format: owner/repo (e.g., 'mapau-demo-devin/running-buddy')[/yellow]")
+        return
+    
+    if not validate_issue_number(issue_number):
+        console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
+        console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
+        return
+    
     github_client = GitHubClient()
     devin_client = DevinClient()
+    
+    repo_exists, repo_error = validate_repository_exists(github_client, repo)
+    if not repo_exists:
+        console.print(f"[red]Error: {repo_error}[/red]")
+        console.print(f"[yellow]Tip: Verify the repository name and your access permissions[/yellow]")
+        return
     
     try:
         issue = github_client.get_issue(repo, issue_number)
@@ -241,6 +316,18 @@ def complete_issue(repo, issue_number):
         console.print(f"[green]Created Devin session: {session['session_id']}[/green]")
         console.print(f"[blue]Session URL: {session['url']}[/blue]")
         
+    except requests.exceptions.HTTPError as e:
+        # Note: After pre-flight repository validation passes, we assume 404 errors
+        # from get_issue() indicate non-existent issues. However, edge cases exist:
+        # - Different permissions (repo accessible but not specific issues)
+        # - Timing issues (repo moved/renamed between repo check and issue check)
+        # - API inconsistencies or temporary GitHub API issues
+        # - Private issues visible only to certain users
+        if e.response.status_code == 404:
+            console.print(f"[red]Error: Issue #{issue_number} not found in repository {repo}[/red]")
+            console.print(f"[yellow]Tip: Use 'list-issues --repo {repo}' to see available issues[/yellow]")
+        else:
+            console.print(f"[red]HTTP Error: {e}[/red]")
     except Exception as e:
         console.print(f"[red]Error completing issue: {e}[/red]")
 
