@@ -109,6 +109,9 @@ def list_issues(repo, state, limit, label, milestone, assignee):
         
         console.print(table)
         
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        console.print(f"[yellow]Tip: Check that the filter values exist in the repository[/yellow]")
     except Exception as e:
         console.print(f"[red]Error listing issues: {e}[/red]")
 
@@ -127,20 +130,23 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
     Returns:
         Selected issue number
     """
-    if github_client.has_many_issues(repo, threshold=10, state=state, labels=labels, milestone=milestone, assignee=assignee):
-        console.print(f"[yellow]This repository has more than 10 {state} issues.[/yellow]")
-        while True:
-            try:
-                limit = click.prompt("How many issues would you like to display?", type=int, default=20)
-                if limit > 0:
-                    break
-                console.print("[red]Please enter a positive number.[/red]")
-            except click.Abort:
-                raise click.ClickException("Operation cancelled")
-    else:
-        limit = 50
-    
-    issues = github_client.list_issues(repo, state=state, limit=limit, labels=labels, milestone=milestone, assignee=assignee)
+    try:
+        if github_client.has_many_issues(repo, threshold=10, state=state, labels=labels, milestone=milestone, assignee=assignee):
+            console.print(f"[yellow]This repository has more than 10 {state} issues.[/yellow]")
+            while True:
+                try:
+                    limit = click.prompt("How many issues would you like to display?", type=int, default=20)
+                    if limit > 0:
+                        break
+                    console.print("[red]Please enter a positive number.[/red]")
+                except click.Abort:
+                    raise click.ClickException("Operation cancelled")
+        else:
+            limit = 50
+        
+        issues = github_client.list_issues(repo, state=state, limit=limit, labels=labels, milestone=milestone, assignee=assignee)
+    except ValueError as e:
+        raise click.ClickException(str(e))
     
     if not issues:
         raise click.ClickException(f"No {state} issues found in repository {repo}")

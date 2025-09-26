@@ -50,6 +50,28 @@ class GitHubClient:
             params['assignee'] = assignee
         
         response = requests.get(url, headers=self.headers, params=params)
+        
+        if response.status_code == 422:
+            error_data = response.json()
+            error_message = error_data.get('message', 'Invalid filter parameters')
+            
+            errors = error_data.get('errors', [])
+            for error in errors:
+                field = error.get('field', '')
+                code = error.get('code', '')
+                
+                if field == 'assignee' and code == 'invalid':
+                    raise ValueError(f"Assignee '{params.get('assignee')}' not found or invalid")
+                elif field == 'milestone' and code == 'invalid':
+                    raise ValueError(f"Milestone '{params.get('milestone')}' not found or invalid")
+            
+            if 'assignee' in params and ('not found' in error_message.lower() or 'invalid' in error_message.lower()):
+                raise ValueError(f"Assignee '{params['assignee']}' not found")
+            elif 'milestone' in params and ('not found' in error_message.lower() or 'invalid' in error_message.lower()):
+                raise ValueError(f"Milestone '{params['milestone']}' not found")
+            else:
+                raise ValueError(f"Invalid filter parameters: {error_message}")
+        
         response.raise_for_status()
         
         if return_headers:
