@@ -18,39 +18,19 @@ import inquirer
 
 from github_client import GitHubClient
 from devin_client import DevinClient
+from github_issues_devin_automation.cli.utils import (
+    validate_repo_format,
+    validate_issue_number, 
+    validate_repository_exists
+)
+from github_issues_devin_automation.cli.commands import (
+    calculate_confidence_score,
+    explain_confidence_score
+)
 
 load_dotenv()
 console = Console()
 
-def validate_repo_format(repo: str) -> bool:
-    """Validate repository format (owner/repo)"""
-    pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?/[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$'
-    return bool(re.match(pattern, repo))
-
-def validate_issue_number(issue_number: int) -> bool:
-    """Validate issue number is positive
-    
-    Note: GitHub API has no separate endpoint to pre-validate issue numbers.
-    This basic validation catches obvious invalid inputs before making API calls.
-    """
-    return issue_number > 0
-
-def validate_repository_exists(github_client: GitHubClient, repo: str) -> tuple[bool, str]:
-    """Check if repository exists and is accessible"""
-    try:
-        github_client.get_repository(repo)
-        return True, ""
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            return False, f"Repository '{repo}' not found or not accessible"
-        elif e.response.status_code == 403:
-            return False, f"Access denied to repository '{repo}'. Check your GitHub token permissions"
-        elif e.response.status_code == 401:
-            return False, f"Authentication failed. Check your GITHUB_TOKEN environment variable"
-        else:
-            return False, f"Error accessing repository '{repo}': {e}"
-    except Exception as e:
-        return False, f"Error accessing repository '{repo}': {e}"
 
 @click.group()
 def cli():
@@ -182,102 +162,6 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
     except KeyboardInterrupt:
         raise click.ClickException("Operation cancelled")
 
-def calculate_confidence_score(issue, repo_info=None):
-    """
-    Calculate confidence score for issue implementation (1-10 scale).
-    Higher score = higher confidence (easier to implement)
-    """
-    score = 5.0  # Base score
-    factors = []
-    
-    title = issue.get('title', '').lower()
-    body = issue.get('body', '') or ''
-    body_lower = body.lower()
-    
-    if any(word in title for word in ['fix', 'bug', 'error', 'broken']):
-        score += 1.5
-        factors.append("Bug fix (typically well-defined)")
-    elif any(word in title for word in ['add', 'implement', 'create']):
-        score += 0.5
-        factors.append("Feature addition")
-    elif any(word in title for word in ['refactor', 'improve', 'optimize']):
-        score -= 0.5
-        factors.append("Refactoring (may require broader changes)")
-    
-    complex_keywords = ['architecture', 'design', 'framework', 'migration', 'breaking change']
-    if any(keyword in title or keyword in body_lower for keyword in complex_keywords):
-        score -= 2.0
-        factors.append("Complex architectural changes detected")
-    
-    simple_keywords = ['typo', 'spelling', 'documentation', 'readme', 'comment']
-    if any(keyword in title or keyword in body_lower for keyword in simple_keywords):
-        score += 2.0
-        factors.append("Simple documentation/text changes")
-    
-    if 'magic number' in title or 'constant' in title:
-        score += 1.5
-        factors.append("Code cleanup - extracting constants")
-    
-    if len(body) > 500:
-        score += 1.0
-        factors.append("Detailed description provided")
-    elif len(body) < 100:
-        score -= 1.0
-        factors.append("Limited description - may need clarification")
-    
-    if '```' in body or 'code' in body_lower:
-        score += 0.5
-        factors.append("Code examples provided")
-    
-    if re.search(r'\d+\.|\-\s|\*\s', body):
-        score += 0.5
-        factors.append("Clear steps or requirements listed")
-    
-    labels = issue.get('labels', [])
-    label_names = [label.get('name', '').lower() for label in labels]
-    
-    if 'good first issue' in label_names or 'beginner' in label_names:
-        score += 1.5
-        factors.append("Marked as beginner-friendly")
-    elif 'help wanted' in label_names:
-        score += 0.5
-        factors.append("Community contribution welcome")
-    
-    if 'bug' in label_names:
-        score += 1.0
-        factors.append("Confirmed bug report")
-    elif 'enhancement' in label_names:
-        score += 0.5
-        factors.append("Feature enhancement")
-    
-    score = max(1.0, min(10.0, score))
-    
-    return round(score, 1), factors
-
-def explain_confidence_score(score, factors):
-    """Generate explanation for the confidence score"""
-    if score >= 8.0:
-        level = "Very High"
-        color = "bright_green"
-        description = "This issue appears straightforward to implement with clear requirements."
-    elif score >= 6.0:
-        level = "High"
-        color = "green"
-        description = "This issue has good clarity and should be manageable to implement."
-    elif score >= 4.0:
-        level = "Medium"
-        color = "yellow"
-        description = "This issue may require some investigation or have moderate complexity."
-    elif score >= 2.0:
-        level = "Low"
-        color = "orange"
-        description = "This issue appears complex or lacks sufficient detail."
-    else:
-        level = "Very Low"
-        color = "red"
-        description = "This issue is likely very complex or poorly defined."
-    
-    return level, color, description
 
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
