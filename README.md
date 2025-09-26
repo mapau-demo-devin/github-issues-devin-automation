@@ -28,19 +28,123 @@ python cli.py --help
 
 ## Configuration
 
-- `GITHUB_TOKEN`: GitHub personal access token
-- `DEVIN_API_KEY`: Devin API key
-- `DEVIN_API_BASE_URL`: Devin API base URL (default: https://api.devin.ai/v1)
+### Required Environment Variables
+- `GITHUB_TOKEN`: GitHub personal access token with repo access
+- `DEVIN_API_KEY`: Devin API key for session creation
+
+### Optional Environment Variables
+- `DEVIN_API_BASE_URL`: Devin API base URL (default: `https://api.devin.ai/v1`)
+- `DEVIN_API_TIMEOUT`: Request timeout in seconds (default: `120`)
+- `DEVIN_API_MAX_RETRIES`: Maximum retry attempts for failed requests (default: `3`)
+
+### Setting up API Keys
+
+1. **GitHub Token**: Create a personal access token at https://github.com/settings/tokens with `repo` scope
+2. **Devin API Key**: Obtain from your Devin AI account settings
+
+```bash
+# Example .env file
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DEVIN_API_KEY=your_devin_api_key_here
+DEVIN_API_BASE_URL=https://api.devin.ai/v1
+DEVIN_API_TIMEOUT=120
+DEVIN_API_MAX_RETRIES=3
+```
 
 ## Usage
 
+### List Issues
+View open issues from any GitHub repository:
+
 ```bash
-# List issues from a repository
-python cli.py list-issues --repo owner/repo
+# List open issues (default)
+python cli.py list-issues --repo microsoft/vscode
 
-# Scope an issue with Devin
-python cli.py scope-issue --repo owner/repo --issue-number 123
+# List all issues (open and closed)
+python cli.py list-issues --repo facebook/react --state all
 
-# Complete an issue with Devin
-python cli.py complete-issue --repo owner/repo --issue-number 123
+# Limit number of results
+python cli.py list-issues --repo nodejs/node --limit 5
 ```
+
+### Scope Issues with AI Analysis
+Get Devin AI to analyze issue complexity and provide estimates:
+
+```bash
+# Analyze a specific issue
+python cli.py scope-issue --repo microsoft/vscode --issue-number 123
+
+# Example output:
+# Scoping issue #123: Add dark mode support
+# Created Devin session: devin-abc123...
+# Session URL: https://app.devin.ai/sessions/abc123...
+```
+
+### Complete Issues with AI Implementation
+Have Devin AI implement solutions for GitHub issues:
+
+```bash
+# Implement a solution for an issue
+python cli.py complete-issue --repo your-org/your-repo --issue-number 456
+
+# Example output:
+# Completing issue #456: Fix login validation bug
+# Created Devin session: devin-def456...
+# Session URL: https://app.devin.ai/sessions/def456...
+```
+
+## Workflow Examples
+
+### 1. Triaging New Issues
+```bash
+# First, list recent issues
+python cli.py list-issues --repo your-org/project --limit 10
+
+# Scope high-priority issues for complexity analysis
+python cli.py scope-issue --repo your-org/project --issue-number 42
+python cli.py scope-issue --repo your-org/project --issue-number 43
+
+# Review Devin's analysis in the provided session URLs
+```
+
+### 2. Automated Issue Resolution
+```bash
+# For well-defined bugs or features, trigger implementation
+python cli.py complete-issue --repo your-org/project --issue-number 42
+
+# Monitor the Devin session for:
+# - Code analysis and understanding
+# - Implementation planning
+# - Pull request creation
+# - Testing and validation
+```
+
+### 3. Batch Processing
+```bash
+# Process multiple issues efficiently
+for issue in 101 102 103; do
+  python cli.py scope-issue --repo your-org/project --issue-number $issue
+  sleep 5  # Rate limiting
+done
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Timeout Errors**: If you encounter 504 Gateway Timeout errors, increase the timeout:
+```bash
+export DEVIN_API_TIMEOUT=300  # 5 minutes
+python cli.py scope-issue --repo owner/repo --issue-number 123
+```
+
+**Rate Limiting**: Add delays between requests for batch processing:
+```bash
+python cli.py scope-issue --repo owner/repo --issue-number 1
+sleep 10
+python cli.py scope-issue --repo owner/repo --issue-number 2
+```
+
+**Authentication Errors**: Verify your tokens have the correct permissions:
+- GitHub token needs `repo` scope for private repositories
+- Devin API key must be valid and active
