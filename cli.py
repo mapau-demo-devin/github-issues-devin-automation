@@ -86,6 +86,62 @@ def list_issues(repo, state, limit):
     except Exception as e:
         console.print(f"[red]Error listing issues: {e}[/red]")
 
+def select_issue_interactively(github_client: GitHubClient, repo: str, state: str = 'open') -> int:
+    """
+    Interactively select an issue from a repository.
+    
+    Args:
+        github_client: GitHub client instance
+        repo: Repository in format 'owner/repo'
+        state: Issue state to filter by
+    
+    Returns:
+        Selected issue number
+    """
+    if github_client.has_many_issues(repo, threshold=10, state=state):
+        console.print(f"[yellow]This repository has more than 10 {state} issues.[/yellow]")
+        while True:
+            try:
+                limit = click.prompt("How many issues would you like to display?", type=int, default=20)
+                if limit > 0:
+                    break
+                console.print("[red]Please enter a positive number.[/red]")
+            except click.Abort:
+                raise click.ClickException("Operation cancelled")
+    else:
+        limit = 50
+    
+    issues = github_client.list_issues(repo, state=state, limit=limit)
+    
+    if not issues:
+        raise click.ClickException(f"No {state} issues found in repository {repo}")
+    
+    table = Table(title=f"Select an issue from {repo}")
+    table.add_column("Index", style="cyan", width=6)
+    table.add_column("Number", style="bright_blue", width=8)
+    table.add_column("Title", style="white")
+    table.add_column("Author", style="yellow", width=15)
+    
+    for i, issue in enumerate(issues, 1):
+        table.add_row(
+            str(i),
+            str(issue['number']),
+            issue['title'][:60] + "..." if len(issue['title']) > 60 else issue['title'],
+            issue['user']['login']
+        )
+    
+    console.print(table)
+    
+    while True:
+        try:
+            selection = click.prompt(
+                f"Select an issue (1-{len(issues)})", 
+                type=click.IntRange(1, len(issues))
+            )
+            return issues[selection - 1]['number']
+        except click.Abort:
+            raise click.ClickException("Operation cancelled")
+
 def calculate_confidence_score(issue, repo_info=None):
     """
     Calculate confidence score for issue implementation (1-10 scale).
@@ -185,17 +241,12 @@ def explain_confidence_score(score, factors):
 
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
-@click.option('--issue-number', required=True, type=int, help='Issue number to scope')
+@click.option('--issue-number', type=int, help='Issue number to scope (optional - will prompt if not provided)')
 def scope_issue(repo, issue_number):
     """Analyze issue complexity and provide confidence score"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
         console.print(f"[yellow]Expected format: owner/repo (e.g., 'mapau-demo-devin/running-buddy')[/yellow]")
-        return
-    
-    if not validate_issue_number(issue_number):
-        console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
-        console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
         return
     
     github_client = GitHubClient()
@@ -205,6 +256,18 @@ def scope_issue(repo, issue_number):
         console.print(f"[red]Error: {repo_error}[/red]")
         console.print(f"[yellow]Tip: Verify the repository name and your access permissions[/yellow]")
         return
+    
+    if issue_number is None:
+        try:
+            issue_number = select_issue_interactively(github_client, repo)
+        except click.ClickException as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return
+    else:
+        if not validate_issue_number(issue_number):
+            console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
+            console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
+            return
     
     try:
         issue = github_client.get_issue(repo, issue_number)
@@ -271,17 +334,12 @@ def scope_issue(repo, issue_number):
 
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
-@click.option('--issue-number', required=True, type=int, help='Issue number to complete')
+@click.option('--issue-number', type=int, help='Issue number to complete (optional - will prompt if not provided)')
 def complete_issue(repo, issue_number):
     """Complete an issue using Devin AI"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
         console.print(f"[yellow]Expected format: owner/repo (e.g., 'mapau-demo-devin/running-buddy')[/yellow]")
-        return
-    
-    if not validate_issue_number(issue_number):
-        console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
-        console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
         return
     
     github_client = GitHubClient()
@@ -292,6 +350,18 @@ def complete_issue(repo, issue_number):
         console.print(f"[red]Error: {repo_error}[/red]")
         console.print(f"[yellow]Tip: Verify the repository name and your access permissions[/yellow]")
         return
+    
+    if issue_number is None:
+        try:
+            issue_number = select_issue_interactively(github_client, repo)
+        except click.ClickException as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return
+    else:
+        if not validate_issue_number(issue_number):
+            console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
+            console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
+            return
     
     try:
         issue = github_client.get_issue(repo, issue_number)
