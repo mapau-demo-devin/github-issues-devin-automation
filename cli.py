@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
+import inquirer
 
 from github_client import GitHubClient
 from devin_client import DevinClient
@@ -88,7 +89,7 @@ def list_issues(repo, state, limit):
 
 def select_issue_interactively(github_client: GitHubClient, repo: str, state: str = 'open') -> int:
     """
-    Interactively select an issue from a repository.
+    Interactively select an issue from a repository using arrow keys.
     
     Args:
         github_client: GitHub client instance
@@ -116,31 +117,33 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
     if not issues:
         raise click.ClickException(f"No {state} issues found in repository {repo}")
     
-    table = Table(title=f"Select an issue from {repo}")
-    table.add_column("Index", style="cyan", width=6)
-    table.add_column("Number", style="bright_blue", width=8)
-    table.add_column("Title", style="white")
-    table.add_column("Author", style="yellow", width=15)
+    issue_choices = []
+    for issue in issues:
+        title = issue['title']
+        if len(title) > 60:
+            title = title[:60] + "..."
+        choice_text = f"#{issue['number']}: {title} (by {issue['user']['login']})"
+        issue_choices.append((choice_text, issue['number']))
     
-    for i, issue in enumerate(issues, 1):
-        table.add_row(
-            str(i),
-            str(issue['number']),
-            issue['title'][:60] + "..." if len(issue['title']) > 60 else issue['title'],
-            issue['user']['login']
-        )
-    
-    console.print(table)
-    
-    while True:
-        try:
-            selection = click.prompt(
-                f"Select an issue (1-{len(issues)})", 
-                type=click.IntRange(1, len(issues))
-            )
-            return issues[selection - 1]['number']
-        except click.Abort:
+    try:
+        console.print(f"\n[blue]Select an issue from {repo}[/blue]")
+        console.print("[dim]Use arrow keys to navigate, Enter to select[/dim]\n")
+        
+        questions = [
+            inquirer.List('issue',
+                         message="Select an issue",
+                         choices=issue_choices,
+                         carousel=True)
+        ]
+        
+        answers = inquirer.prompt(questions)
+        if answers is None:
             raise click.ClickException("Operation cancelled")
+        
+        return answers['issue']
+        
+    except KeyboardInterrupt:
+        raise click.ClickException("Operation cancelled")
 
 def calculate_confidence_score(issue, repo_info=None):
     """
