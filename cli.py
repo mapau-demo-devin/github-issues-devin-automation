@@ -29,8 +29,8 @@ def validate_repo_format(repo: str) -> bool:
 def validate_issue_number(issue_number: int) -> bool:
     """Validate issue number is positive
     
-    Note: GitHub API has no separate endpoint to pre-validate issue numbers. (important-comment)
-    This basic validation catches obvious invalid inputs before making API calls. (important-comment)
+    Note: GitHub API has no separate endpoint to pre-validate issue numbers.
+    This basic validation catches obvious invalid inputs before making API calls.
     """
     return issue_number > 0
 
@@ -255,12 +255,12 @@ def scope_issue(repo, issue_number):
             console.print("[dim]Skipping Devin session creation.[/dim]")
         
     except requests.exceptions.HTTPError as e:
-        # Note: After pre-flight repository validation passes, we assume 404 errors (important-comment)
-        # from get_issue() indicate non-existent issues. However, edge cases exist: (important-comment)
-        # - Different permissions (repo accessible but not specific issues) (important-comment)
-        # - Timing issues (repo moved/renamed between repo check and issue check) (important-comment)
-        # - API inconsistencies or temporary GitHub API issues (important-comment)
-        # - Private issues visible only to certain users (important-comment)
+        # Note: After pre-flight repository validation passes, we assume 404 errors
+        # from get_issue() indicate non-existent issues. However, edge cases exist:
+        # - Different permissions (repo accessible but not specific issues)
+        # - Timing issues (repo moved/renamed between repo check and issue check)
+        # - API inconsistencies or temporary GitHub API issues
+        # - Private issues visible only to certain users
         if e.response.status_code == 404:
             console.print(f"[red]Error: Issue #{issue_number} not found in repository {repo}[/red]")
             console.print(f"[yellow]Tip: Use 'list-issues --repo {repo}' to see available issues[/yellow]")
