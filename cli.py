@@ -109,6 +109,9 @@ def list_issues(repo, state, limit, label, milestone, assignee):
         
         console.print(table)
         
+        if github_client.has_many_issues(repo, threshold=limit, state=state, labels=label, milestone=milestone, assignee=assignee):
+            console.print(f"\n[yellow]Note: Showing {limit} issues by default. You can view more issues by using the --limit argument.[/yellow]")
+        
     except ValueError as e:
         console.print(f"[red]Error: {e}[/red]")
         console.print(f"[yellow]Tip: Check that the filter values exist in the repository[/yellow]")
