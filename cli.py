@@ -8,6 +8,7 @@ A command-line tool for integrating GitHub Issues with Devin AI.
 import os
 import re
 import click
+import requests
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
@@ -207,6 +208,18 @@ def scope_issue(repo, issue_number):
         else:
             console.print("[dim]Skipping Devin session creation.[/dim]")
         
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            console.print(f"[red]Error: Issue #{issue_number} not found in repository {repo}[/red]")
+            console.print(f"[yellow]Tip: Use 'list-issues --repo {repo}' to see available issues[/yellow]")
+        elif e.response.status_code == 403:
+            console.print(f"[red]Error: Access denied to repository {repo}[/red]")
+            console.print(f"[yellow]Tip: Check your GitHub token permissions[/yellow]")
+        elif e.response.status_code == 401:
+            console.print(f"[red]Error: Authentication failed[/red]")
+            console.print(f"[yellow]Tip: Check your GITHUB_TOKEN environment variable[/yellow]")
+        else:
+            console.print(f"[red]HTTP Error: {e}[/red]")
     except Exception as e:
         console.print(f"[red]Error scoping issue: {e}[/red]")
 
@@ -241,6 +254,18 @@ def complete_issue(repo, issue_number):
         console.print(f"[green]Created Devin session: {session['session_id']}[/green]")
         console.print(f"[blue]Session URL: {session['url']}[/blue]")
         
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            console.print(f"[red]Error: Issue #{issue_number} not found in repository {repo}[/red]")
+            console.print(f"[yellow]Tip: Use 'list-issues --repo {repo}' to see available issues[/yellow]")
+        elif e.response.status_code == 403:
+            console.print(f"[red]Error: Access denied to repository {repo}[/red]")
+            console.print(f"[yellow]Tip: Check your GitHub token permissions[/yellow]")
+        elif e.response.status_code == 401:
+            console.print(f"[red]Error: Authentication failed[/red]")
+            console.print(f"[yellow]Tip: Check your GITHUB_TOKEN environment variable[/yellow]")
+        else:
+            console.print(f"[red]HTTP Error: {e}[/red]")
     except Exception as e:
         console.print(f"[red]Error completing issue: {e}[/red]")
 
