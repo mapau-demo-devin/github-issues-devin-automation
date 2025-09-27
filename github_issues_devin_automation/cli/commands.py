@@ -22,6 +22,47 @@ from .utils import (
     console
 )
 
+def create_issues_table(issues, title="Issues", filter_info=None):
+    """
+    Create a rich table for displaying GitHub issues.
+    
+    Args:
+        issues: List of issue dictionaries from GitHub API
+        title: Table title
+        filter_info: Optional list of filter descriptions
+    
+    Returns:
+        Rich Table object
+    """
+    if filter_info:
+        title += f" (filtered by {', '.join(filter_info)})"
+    
+    table = Table(title=title)
+    table.add_column("Number", style="cyan")
+    table.add_column("Title", style="white")
+    table.add_column("State", style="green")
+    table.add_column("Author", style="yellow")
+    table.add_column("Labels", style="magenta")
+    table.add_column("Milestone", style="blue")
+    table.add_column("Assignee", style="red")
+    
+    for issue in issues:
+        labels_text = ', '.join([str(label['name']) for label in issue.get('labels', [])])
+        milestone_text = str(issue.get('milestone', {}).get('title', '')) if issue.get('milestone') else ''
+        assignee_text = str(issue.get('assignee', {}).get('login', '')) if issue.get('assignee') else ''
+        
+        table.add_row(
+            str(issue['number']),
+            str(issue['title'])[:50] + "..." if len(str(issue['title'])) > 50 else str(issue['title']),
+            str(issue['state']),
+            str(issue['user']['login']),
+            labels_text[:20] + "..." if len(labels_text) > 20 else labels_text,
+            milestone_text[:15] + "..." if len(milestone_text) > 15 else milestone_text,
+            assignee_text
+        )
+    
+    return table
+
 def calculate_confidence_score(issue, repo_info=None):
     """
     Calculate confidence score for issue implementation (1-10 scale).
@@ -146,34 +187,7 @@ def list_issues(repo, state, limit, label, milestone, assignee):
     if assignee:
         filter_info.append(f"assignee: {assignee}")
     
-    title = f"Issues from {repo}"
-    if filter_info:
-        title += f" (filtered by {', '.join(filter_info)})"
-    
-    table = Table(title=title)
-    table.add_column("Number", style="cyan")
-    table.add_column("Title", style="white")
-    table.add_column("State", style="green")
-    table.add_column("Author", style="yellow")
-    table.add_column("Labels", style="magenta")
-    table.add_column("Milestone", style="blue")
-    table.add_column("Assignee", style="red")
-    
-    for issue in issues:
-        labels_text = ', '.join([str(label['name']) for label in issue.get('labels', [])])
-        milestone_text = str(issue.get('milestone', {}).get('title', '')) if issue.get('milestone') else ''
-        assignee_text = str(issue.get('assignee', {}).get('login', '')) if issue.get('assignee') else ''
-        
-        table.add_row(
-            str(issue['number']),
-            str(issue['title'])[:50] + "..." if len(str(issue['title'])) > 50 else str(issue['title']),
-            str(issue['state']),
-            str(issue['user']['login']),
-            labels_text[:20] + "..." if len(labels_text) > 20 else labels_text,
-            milestone_text[:15] + "..." if len(milestone_text) > 15 else milestone_text,
-            assignee_text
-        )
-    
+    table = create_issues_table(issues, f"Issues from {repo}", filter_info)
     console.print(table)
     
     if github_client.has_many_issues(repo, threshold=limit, state=state, labels=label, milestone=milestone, assignee=assignee):

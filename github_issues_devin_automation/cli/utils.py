@@ -122,6 +122,18 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
     if not issues:
         raise click.ClickException(f"No {state} issues found in repository {repo}")
     
+    from .commands import create_issues_table
+    filter_info = []
+    if labels:
+        filter_info.append(f"labels: {labels}")
+    if milestone:
+        filter_info.append(f"milestone: {milestone}")
+    if assignee:
+        filter_info.append(f"assignee: {assignee}")
+    
+    table = create_issues_table(issues, f"Issues from {repo}", filter_info if filter_info else None)
+    console.print(table)
+    
     issue_choices = []
     for issue in issues:
         title = str(issue['title'])
@@ -131,7 +143,7 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         issue_choices.append((choice_text, issue['number']))
     
     try:
-        console.print(f"\n[blue]Select an issue from {repo}[/blue]")
+        console.print(f"\n[blue]Select an issue from the table above[/blue]")
         console.print("[dim]Use arrow keys to navigate, Enter to select[/dim]\n")
         
         questions = [
