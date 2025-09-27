@@ -160,15 +160,15 @@ def list_issues(repo, state, limit, label, milestone, assignee):
     table.add_column("Assignee", style="red")
     
     for issue in issues:
-        labels_text = ', '.join([label['name'] for label in issue.get('labels', [])])
-        milestone_text = issue.get('milestone', {}).get('title', '') if issue.get('milestone') else ''
-        assignee_text = issue.get('assignee', {}).get('login', '') if issue.get('assignee') else ''
+        labels_text = ', '.join([str(label['name']) for label in issue.get('labels', [])])
+        milestone_text = str(issue.get('milestone', {}).get('title', '')) if issue.get('milestone') else ''
+        assignee_text = str(issue.get('assignee', {}).get('login', '')) if issue.get('assignee') else ''
         
         table.add_row(
             str(issue['number']),
-            issue['title'][:50] + "..." if len(issue['title']) > 50 else issue['title'],
-            issue['state'],
-            issue['user']['login'],
+            str(issue['title'])[:50] + "..." if len(str(issue['title'])) > 50 else str(issue['title']),
+            str(issue['state']),
+            str(issue['user']['login']),
             labels_text[:20] + "..." if len(labels_text) > 20 else labels_text,
             milestone_text[:15] + "..." if len(milestone_text) > 15 else milestone_text,
             assignee_text

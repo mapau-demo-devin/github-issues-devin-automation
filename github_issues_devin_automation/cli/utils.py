@@ -7,7 +7,7 @@ import requests
 import click
 import inquirer
 from functools import wraps
-from typing import Optional
+from typing import Optional, Dict, Any
 from rich.console import Console
 from ..clients.github_client import GitHubClient
 from ..clients.devin_client import DevinClient
@@ -124,7 +124,7 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
     
     issue_choices = []
     for issue in issues:
-        title = issue['title']
+        title = str(issue['title'])
         if len(title) > 60:
             title = title[:60] + "..."
         choice_text = f"#{issue['number']}: {title} (by {issue['user']['login']})"
