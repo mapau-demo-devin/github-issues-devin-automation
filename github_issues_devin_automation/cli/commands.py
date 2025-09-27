@@ -5,6 +5,7 @@ CLI command definitions for GitHub Issues Devin Automation.
 import re
 import click
 import requests
+from typing import Dict, Any
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -17,6 +18,7 @@ from .utils import (
     validate_repository_exists,
     handle_common_errors,
     _process_issue_with_devin,
+    select_issue_interactively,
     console
 )
 
@@ -126,42 +128,68 @@ def cli():
 @click.option('--repo', required=True, help='Repository in format owner/repo')
 @click.option('--state', default='open', help='Issue state (open, closed, all)')
 @click.option('--limit', default=10, help='Maximum number of issues to display')
+@click.option('--label', help='Filter by label names (comma-separated for multiple)')
+@click.option('--milestone', help='Filter by milestone (number, "*" for any, "none" for none)')
+@click.option('--assignee', help='Filter by assignee (username, "*" for any, "none" for unassigned)')
 @handle_common_errors
-def list_issues(repo, state, limit):
+def list_issues(repo, state, limit, label, milestone, assignee):
     """List GitHub issues from a repository"""
     github_client = GitHubClient()
     
-    issues = github_client.list_issues(repo, state=state, limit=limit)
+    issues = github_client.list_issues(repo, state=state, limit=limit, labels=label, milestone=milestone, assignee=assignee)
     
-    table = Table(title=f"Issues from {repo}")
+    filter_info = []
+    if label:
+        filter_info.append(f"labels: {label}")
+    if milestone:
+        filter_info.append(f"milestone: {milestone}")
+    if assignee:
+        filter_info.append(f"assignee: {assignee}")
+    
+    title = f"Issues from {repo}"
+    if filter_info:
+        title += f" (filtered by {', '.join(filter_info)})"
+    
+    table = Table(title=title)
     table.add_column("Number", style="cyan")
     table.add_column("Title", style="white")
     table.add_column("State", style="green")
     table.add_column("Author", style="yellow")
+    table.add_column("Labels", style="magenta")
+    table.add_column("Milestone", style="blue")
+    table.add_column("Assignee", style="red")
     
     for issue in issues:
+        labels_text = ', '.join([str(label['name']) for label in issue.get('labels', [])])
+        milestone_text = str(issue.get('milestone', {}).get('title', '')) if issue.get('milestone') else ''
+        assignee_text = str(issue.get('assignee', {}).get('login', '')) if issue.get('assignee') else ''
+        
         table.add_row(
             str(issue['number']),
-            issue['title'][:50] + "..." if len(issue['title']) > 50 else issue['title'],
-            issue['state'],
-            issue['user']['login']
+            str(issue['title'])[:50] + "..." if len(str(issue['title'])) > 50 else str(issue['title']),
+            str(issue['state']),
+            str(issue['user']['login']),
+            labels_text[:20] + "..." if len(labels_text) > 20 else labels_text,
+            milestone_text[:15] + "..." if len(milestone_text) > 15 else milestone_text,
+            assignee_text
         )
     
     console.print(table)
+    
+    if github_client.has_many_issues(repo, threshold=limit, state=state, labels=label, milestone=milestone, assignee=assignee):
+        console.print(f"\n[yellow]Note: Showing {limit} issues by default. You can view more issues by using the --limit argument.[/yellow]")
 
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
-@click.option('--issue-number', required=True, type=int, help='Issue number to scope')
-def scope_issue(repo, issue_number):
+@click.option('--issue-number', type=int, help='Issue number to scope (optional - will prompt if not provided)')
+@click.option('--label', help='Filter by label names (comma-separated for multiple)')
+@click.option('--milestone', help='Filter by milestone (number, "*" for any, "none" for none)')
+@click.option('--assignee', help='Filter by assignee (username, "*" for any, "none" for unassigned)')
+def scope_issue(repo, issue_number, label, milestone, assignee):
     """Analyze issue complexity and provide confidence score"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
         console.print(f"[yellow]Expected format: owner/repo (e.g., 'mapau-demo-devin/running-buddy')[/yellow]")
-        return
-    
-    if not validate_issue_number(issue_number):
-        console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
-        console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
         return
     
     github_client = GitHubClient()
@@ -171,6 +199,18 @@ def scope_issue(repo, issue_number):
         console.print(f"[red]Error: {repo_error}[/red]")
         console.print(f"[yellow]Tip: Verify the repository name and your access permissions[/yellow]")
         return
+    
+    if issue_number is None:
+        try:
+            issue_number = select_issue_interactively(github_client, repo, labels=label, milestone=milestone, assignee=assignee)
+        except click.ClickException as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return
+    else:
+        if not validate_issue_number(issue_number):
+            console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
+            console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
+            return
     
     try:
         issue = github_client.get_issue(repo, issue_number)
@@ -235,17 +275,15 @@ def scope_issue(repo, issue_number):
 
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
-@click.option('--issue-number', required=True, type=int, help='Issue number to complete')
-def complete_issue(repo, issue_number):
+@click.option('--issue-number', type=int, help='Issue number to complete (optional - will prompt if not provided)')
+@click.option('--label', help='Filter by label names (comma-separated for multiple)')
+@click.option('--milestone', help='Filter by milestone (number, "*" for any, "none" for none)')
+@click.option('--assignee', help='Filter by assignee (username, "*" for any, "none" for unassigned)')
+def complete_issue(repo, issue_number, label, milestone, assignee):
     """Complete an issue using Devin AI"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
         console.print(f"[yellow]Expected format: owner/repo (e.g., 'mapau-demo-devin/running-buddy')[/yellow]")
-        return
-    
-    if not validate_issue_number(issue_number):
-        console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
-        console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
         return
     
     github_client = GitHubClient()
@@ -255,6 +293,18 @@ def complete_issue(repo, issue_number):
         console.print(f"[red]Error: {repo_error}[/red]")
         console.print(f"[yellow]Tip: Verify the repository name and your access permissions[/yellow]")
         return
+    
+    if issue_number is None:
+        try:
+            issue_number = select_issue_interactively(github_client, repo, labels=label, milestone=milestone, assignee=assignee)
+        except click.ClickException as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return
+    else:
+        if not validate_issue_number(issue_number):
+            console.print(f"[red]Error: Invalid issue number '{issue_number}'[/red]")
+            console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
+            return
     
     prompt_template = """
     Please implement a solution for this GitHub issue:
