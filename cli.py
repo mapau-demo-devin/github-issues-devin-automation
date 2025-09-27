@@ -17,7 +17,7 @@ from rich.text import Text
 import inquirer
 
 from github_client import GitHubClient
-from devin_client import DevinClient
+from github_issues_devin_automation.clients.devin_client import DevinClient
 from github_issues_devin_automation.cli.utils import (
     validate_repo_format,
     validate_issue_number, 

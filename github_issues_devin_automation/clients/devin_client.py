@@ -38,6 +38,51 @@ class DevinClient:
         
         return self._make_request_with_retry('POST', url, json=data)
     
+    def send_message(self, session_id: str, message: str) -> None:
+        """
+        Send a message to an existing Devin session.
+        
+        Args:
+            session_id: ID of the session to send message to
+            message: Message to send to Devin
+        """
+        url = f"{self.base_url}/sessions/{session_id}/message"
+        
+        data = {
+            'message': message
+        }
+        
+        self._make_request_with_retry('POST', url, json=data)
+    
+    def get_session(self, session_id: str) -> Dict[Any, Any]:
+        """
+        Get details about an existing session.
+        
+        Args:
+            session_id: ID of the session to retrieve
+        
+        Returns:
+            Session details dictionary
+        """
+        url = f"{self.base_url}/sessions/{session_id}"
+        
+        return self._make_request_with_retry('GET', url)
+    
+    def list_sessions(self, limit: int = 10) -> Dict[Any, Any]:
+        """
+        List recent Devin sessions.
+        
+        Args:
+            limit: Maximum number of sessions to return
+        
+        Returns:
+            Sessions list response
+        """
+        url = f"{self.base_url}/sessions"
+        params = {'limit': limit}
+        
+        return self._make_request_with_retry('GET', url, params=params)
+    
     def _make_request_with_retry(self, method: str, url: str, **kwargs) -> Dict[Any, Any]:
         """
         Make HTTP request with retry logic and proper timeout handling.
