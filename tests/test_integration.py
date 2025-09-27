@@ -39,33 +39,6 @@ class TestIntegrationWorkflows:
             
             assert mock_devin_client.create_session.call_count == 1
     
-    def test_complete_workflow_oppia(self, mock_env_vars, mock_github_client, mock_devin_client):
-        """Test complete workflow for oppia/oppia repository."""
-        with patch('github_issues_devin_automation.cli.commands.GitHubClient', return_value=mock_github_client), \
-             patch('github_issues_devin_automation.cli.utils.GitHubClient', return_value=mock_github_client), \
-             patch('github_issues_devin_automation.cli.utils.DevinClient', return_value=mock_devin_client):
-            
-            runner = CliRunner()
-            
-            result1 = runner.invoke(cli, [
-                'list-issues',
-                '--repo', 'oppia/oppia',
-                '--label', 'enhancement',
-                '--state', 'open'
-            ])
-            assert result1.exit_code == 0
-            assert 'Issues from oppia/oppia' in result1.output
-            
-            result2 = runner.invoke(cli, [
-                'scope-issue',
-                '--repo', 'oppia/oppia',
-                '--issue-number', '101',
-                '--label', 'enhancement'
-            ], input='y\n')
-            assert result2.exit_code == 0
-            assert 'Creating Devin session' in result2.output
-            
-            assert mock_devin_client.create_session.call_count == 1
     
     def test_all_filter_combinations_running_buddy(self, mock_env_vars, mock_github_client):
         """Test all filter combinations on running-buddy repository."""
@@ -96,29 +69,6 @@ class TestIntegrationWorkflows:
                 assert result.exit_code == 0, f"Failed with filters: {filters}"
                 mock_github_client.list_issues.assert_called()
     
-    def test_all_filter_combinations_oppia(self, mock_env_vars, mock_github_client):
-        """Test all filter combinations on oppia/oppia repository."""
-        with patch('github_issues_devin_automation.cli.commands.GitHubClient', return_value=mock_github_client):
-            runner = CliRunner()
-            
-            filter_combinations = [
-                {},
-                {'label': 'enhancement'},
-                {'milestone': '10'},
-                {'assignee': 'ui-developer'},
-                {'label': 'bug,performance'},
-                {'state': 'closed'},
-                {'state': 'all', 'limit': '20'},
-            ]
-            
-            for filters in filter_combinations:
-                cmd_args = ['list-issues', '--repo', 'oppia/oppia']
-                for key, value in filters.items():
-                    cmd_args.extend([f'--{key}', value])
-                
-                result = runner.invoke(cli, cmd_args)
-                assert result.exit_code == 0, f"Failed with filters: {filters}"
-                mock_github_client.list_issues.assert_called()
     
     def test_error_scenarios(self, mock_env_vars, mock_github_client, mock_devin_client):
         """Test various error scenarios."""
@@ -155,7 +105,7 @@ class TestIntegrationWorkflows:
             
             runner.invoke(cli, ['list-issues', '--repo', 'mapau-demo-devin/running-buddy'])
             runner.invoke(cli, ['scope-issue', '--repo', 'mapau-demo-devin/running-buddy', '--issue-number', '1'], input='y\n')
-            runner.invoke(cli, ['complete-issue', '--repo', 'oppia/oppia', '--issue-number', '101'])
+            runner.invoke(cli, ['complete-issue', '--repo', 'mapau-demo-devin/running-buddy', '--issue-number', '2'])
             
             mock_requests_get.assert_not_called()
             mock_requests_post.assert_not_called()

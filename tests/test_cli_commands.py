@@ -43,31 +43,13 @@ class TestCLICommands:
                 assignee='developer1'
             )
     
-    def test_list_issues_oppia_repo(self, mock_env_vars, mock_github_client):
-        """Test list-issues command with oppia/oppia repository."""
-        with patch('github_issues_devin_automation.cli.commands.GitHubClient', return_value=mock_github_client):
-            runner = CliRunner()
-            result = runner.invoke(cli, ['list-issues', '--repo', 'oppia/oppia'])
-            
-            assert result.exit_code == 0
-            assert 'Issues from oppia/oppia' in result.output
-            mock_github_client.list_issues.assert_called_with(
-                'oppia/oppia',
-                state='open',
-                limit=10,
-                labels=None,
-                milestone=None,
-                assignee=None
-            )
     
     @pytest.mark.parametrize("repo,filters", [
         ("mapau-demo-devin/running-buddy", {}),
-        ("oppia/oppia", {}),
         ("mapau-demo-devin/running-buddy", {"label": "bug,enhancement"}),
         ("mapau-demo-devin/running-buddy", {"milestone": "1"}),
         ("mapau-demo-devin/running-buddy", {"assignee": "testuser"}),
         ("mapau-demo-devin/running-buddy", {"label": "bug", "milestone": "1", "assignee": "developer1"}),
-        ("oppia/oppia", {"label": "enhancement", "milestone": "10"}),
     ])
     def test_list_issues_filter_combinations(self, mock_env_vars, mock_github_client, repo, filters):
         """Test list-issues command with various filter combinations."""
@@ -179,7 +161,7 @@ class TestCLICommands:
             runner = CliRunner()
             result = runner.invoke(cli, [
                 'complete-issue',
-                '--repo', 'oppia/oppia'
+                '--repo', 'mapau-demo-devin/running-buddy'
             ])
             
             assert result.exit_code == 0

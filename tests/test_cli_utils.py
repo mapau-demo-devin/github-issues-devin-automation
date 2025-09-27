@@ -20,7 +20,6 @@ class TestValidationFunctions:
     @pytest.mark.parametrize("repo,expected", [
         ("owner/repo", True),
         ("mapau-demo-devin/running-buddy", True),
-        ("oppia/oppia", True),
         ("user123/my-repo_name", True),
         ("invalid-repo", False),
         ("owner/", False),

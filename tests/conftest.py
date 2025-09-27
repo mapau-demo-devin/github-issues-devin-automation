@@ -74,42 +74,6 @@ def sample_github_issues():
     ]
 
 
-@pytest.fixture
-def sample_oppia_issues():
-    """Sample Oppia repository issues for testing."""
-    return [
-        {
-            'number': 101,
-            'title': 'Improve lesson creation workflow',
-            'body': 'The current lesson creation process is too complex for new users. We need to simplify the UI.',
-            'state': 'open',
-            'user': {'login': 'oppia-contributor'},
-            'labels': [
-                {'name': 'enhancement'},
-                {'name': 'UI/UX'}
-            ],
-            'milestone': {
-                'title': 'Release 3.0',
-                'number': 10
-            },
-            'assignee': {
-                'login': 'ui-developer'
-            }
-        },
-        {
-            'number': 102,
-            'title': 'Fix memory leak in exploration player',
-            'body': 'There is a memory leak when playing long explorations. Need to investigate and fix.',
-            'state': 'open',
-            'user': {'login': 'oppia-dev'},
-            'labels': [
-                {'name': 'bug'},
-                {'name': 'performance'}
-            ],
-            'milestone': None,
-            'assignee': None
-        }
-    ]
 
 
 @pytest.fixture
@@ -122,13 +86,6 @@ def sample_repository_info():
             'description': 'A smart running companion app',
             'private': False,
             'owner': {'login': 'mapau-demo-devin'}
-        },
-        'oppia': {
-            'name': 'oppia',
-            'full_name': 'oppia/oppia',
-            'description': 'A free, online learning platform',
-            'private': False,
-            'owner': {'login': 'oppia'}
         }
     }
 
@@ -144,15 +101,13 @@ def mock_devin_session_response():
 
 
 @pytest.fixture
-def mock_github_client(sample_github_issues, sample_oppia_issues, sample_repository_info):
+def mock_github_client(sample_github_issues, sample_repository_info):
     """Mock GitHub client with predefined responses."""
     mock_client = Mock()
     
     def mock_list_issues(repo, state='open', limit=10, return_headers=False, labels=None, milestone=None, assignee=None):
         if repo == 'mapau-demo-devin/running-buddy':
             issues = sample_github_issues
-        elif repo == 'oppia/oppia':
-            issues = sample_oppia_issues
         else:
             issues = []
         
@@ -193,8 +148,6 @@ def mock_github_client(sample_github_issues, sample_oppia_issues, sample_reposit
     def mock_get_issue(repo, issue_number):
         if repo == 'mapau-demo-devin/running-buddy':
             issues = sample_github_issues
-        elif repo == 'oppia/oppia':
-            issues = sample_oppia_issues
         else:
             from requests.exceptions import HTTPError
             response = Mock()
