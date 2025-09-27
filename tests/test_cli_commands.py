@@ -4,6 +4,10 @@ from click.testing import CliRunner
 from unittest.mock import Mock, patch, MagicMock
 import requests
 
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from cli import cli
 from github_issues_devin_automation.cli.commands import calculate_confidence_score, explain_confidence_score
 
