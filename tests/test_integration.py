@@ -133,22 +133,18 @@ class TestIntegrationWorkflows:
             assert result2.exit_code == 0
             assert 'test-session-123' in result2.output
             
-            result3 = runner.invoke(cli, ['list-issues', '--repo', 'oppia/oppia'])
-            assert result3.exit_code == 0
-            
-            result4 = runner.invoke(cli, [
+            result3 = runner.invoke(cli, [
                 'complete-issue',
-                '--repo', 'oppia/oppia',
-                '--issue-number', '101'
+                '--repo', 'mapau-demo-devin/running-buddy',
+                '--issue-number', '2'
             ])
-            assert result4.exit_code == 0
-            assert 'test-session-123' in result4.output
+            assert result3.exit_code == 0
+            assert 'test-session-123' in result3.output
             
             assert mock_devin_client.create_session.call_count == 2
             
             github_calls = [call[0] for call in mock_github_client.list_issues.call_args_list]
             assert any('running-buddy' in str(call) for call in github_calls)
-            assert any('oppia' in str(call) for call in github_calls)
     
     def test_comprehensive_command_coverage(self, mock_env_vars, mock_github_client, mock_devin_client):
         """Test that all commands run without error with various configurations."""
@@ -162,16 +158,16 @@ class TestIntegrationWorkflows:
             
             test_cases = [
                 ['list-issues', '--repo', 'mapau-demo-devin/running-buddy'],
-                ['list-issues', '--repo', 'oppia/oppia', '--state', 'closed'],
+                ['list-issues', '--repo', 'mapau-demo-devin/running-buddy', '--state', 'closed'],
                 ['list-issues', '--repo', 'mapau-demo-devin/running-buddy', '--label', 'bug', '--limit', '20'],
-                ['list-issues', '--repo', 'oppia/oppia', '--milestone', '10', '--assignee', 'ui-developer'],
+                ['list-issues', '--repo', 'mapau-demo-devin/running-buddy', '--milestone', '1', '--assignee', 'developer1'],
                 
                 ['scope-issue', '--repo', 'mapau-demo-devin/running-buddy', '--issue-number', '1'],
-                ['scope-issue', '--repo', 'oppia/oppia', '--issue-number', '101'],
+                ['scope-issue', '--repo', 'mapau-demo-devin/running-buddy', '--issue-number', '2'],
                 ['scope-issue', '--repo', 'mapau-demo-devin/running-buddy', '--label', 'enhancement'],
                 
                 ['complete-issue', '--repo', 'mapau-demo-devin/running-buddy', '--issue-number', '2'],
-                ['complete-issue', '--repo', 'oppia/oppia', '--issue-number', '102'],
+                ['complete-issue', '--repo', 'mapau-demo-devin/running-buddy', '--issue-number', '3'],
                 ['complete-issue', '--repo', 'mapau-demo-devin/running-buddy', '--assignee', 'none'],
             ]
             
