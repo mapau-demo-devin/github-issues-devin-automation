@@ -88,7 +88,7 @@ def _process_issue_with_devin(repo: str, issue_number: int, prompt_template: str
 
 def select_issue_interactively(github_client: GitHubClient, repo: str, state: str = 'open', labels: Optional[str] = None, milestone: Optional[str] = None, assignee: Optional[str] = None) -> int:
     """
-    Interactively select an issue from a repository using arrow keys.
+    Interactively select an issue from a repository using enhanced selection with rich metadata.
     
     Args:
         github_client: GitHub client instance
@@ -137,9 +137,28 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
     issue_choices = []
     for issue in issues:
         title = str(issue['title'])
-        if len(title) > 60:
-            title = title[:60] + "..."
-        choice_text = f"#{issue['number']}: {title} (by {issue['user']['login']})"
+        if len(title) > 40:
+            title = title[:40] + "..."
+        
+        labels_text = ', '.join([str(label['name']) for label in issue.get('labels', [])])
+        if len(labels_text) > 20:
+            labels_text = labels_text[:20] + "..."
+        
+        milestone_text = str(issue.get('milestone', {}).get('title', '')) if issue.get('milestone') else ''
+        if len(milestone_text) > 15:
+            milestone_text = milestone_text[:15] + "..."
+        
+        assignee_text = str(issue.get('assignee', {}).get('login', '')) if issue.get('assignee') else ''
+        
+        choice_parts = [f"#{issue['number']}: {title}"]
+        if labels_text:
+            choice_parts.append(f"[{labels_text}]")
+        if milestone_text:
+            choice_parts.append(f"({milestone_text})")
+        if assignee_text:
+            choice_parts.append(f"@{assignee_text}")
+        
+        choice_text = " ".join(choice_parts)
         issue_choices.append((choice_text, issue['number']))
     
     try:
