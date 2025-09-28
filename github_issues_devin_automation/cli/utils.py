@@ -150,9 +150,10 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         
         assignee_text = str(issue.get('assignee', {}).get('login', '')) if issue.get('assignee') else ''
         
-        choice_parts = [f"#{issue['number']}: {title}"]
+        base_title = f"#{issue['number']}: {title}"
         
         metadata_parts = []
+        
         if labels_text:
             metadata_parts.append(f"🏷️ {labels_text}")
         if milestone_text:
@@ -161,9 +162,9 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
             metadata_parts.append(f"👤 {assignee_text}")
         
         if metadata_parts:
-            choice_text = choice_parts[0] + "  •  " + "  •  ".join(metadata_parts)
+            choice_text = base_title + "  •  " + "  •  ".join(metadata_parts)
         else:
-            choice_text = choice_parts[0]
+            choice_text = base_title
             
         issue_choices.append((choice_text, issue['number']))
     
