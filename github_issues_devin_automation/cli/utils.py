@@ -151,14 +151,20 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         assignee_text = str(issue.get('assignee', {}).get('login', '')) if issue.get('assignee') else ''
         
         choice_parts = [f"#{issue['number']}: {title}"]
-        if labels_text:
-            choice_parts.append(f"[{labels_text}]")
-        if milestone_text:
-            choice_parts.append(f"({milestone_text})")
-        if assignee_text:
-            choice_parts.append(f"@{assignee_text}")
         
-        choice_text = " ".join(choice_parts)
+        metadata_lines = []
+        if labels_text:
+            metadata_lines.append(f"         🏷️  {labels_text}")
+        if milestone_text:
+            metadata_lines.append(f"         🎯 {milestone_text}")
+        if assignee_text:
+            metadata_lines.append(f"         👤 {assignee_text}")
+        
+        if metadata_lines:
+            choice_text = choice_parts[0] + "\n" + "\n".join(metadata_lines)
+        else:
+            choice_text = choice_parts[0]
+            
         issue_choices.append((choice_text, issue['number']))
     
     try:
