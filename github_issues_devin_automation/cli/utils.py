@@ -155,14 +155,15 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         metadata_parts = []
         
         if labels_text:
-            metadata_parts.append(f"🏷️  {labels_text}")
+            metadata_parts.append(f"🏷️ {labels_text}")
         if milestone_text:
             metadata_parts.append(f"🎯 {milestone_text}")
         if assignee_text:
             metadata_parts.append(f"👤 {assignee_text}")
         
         if metadata_parts:
-            choice_text = base_title + "  •  " + "  •  ".join(metadata_parts)
+            padded_title = base_title.ljust(50)
+            choice_text = padded_title + "  •  " + "  •  ".join(metadata_parts)
         else:
             choice_text = base_title
             
