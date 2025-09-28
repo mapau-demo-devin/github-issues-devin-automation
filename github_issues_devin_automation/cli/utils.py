@@ -102,16 +102,9 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         Selected issue number
     """
     try:
-        if github_client.has_many_issues(repo, threshold=10, state=state, labels=labels, milestone=milestone, assignee=assignee):
-            console.print(f"[yellow]This repository has more than 10 {state} issues.[/yellow]")
-            while True:
-                try:
-                    limit = click.prompt("How many issues would you like to display?", type=int, default=20)
-                    if limit > 0:
-                        break
-                    console.print("[red]Please enter a positive number.[/red]")
-                except click.Abort:
-                    raise click.ClickException("Operation cancelled")
+        has_many_issues = github_client.has_many_issues(repo, threshold=10, state=state, labels=labels, milestone=milestone, assignee=assignee)
+        if has_many_issues:
+            limit = 10
         else:
             limit = 50
         
@@ -144,6 +137,9 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         answers = inquirer.prompt(questions)
         if answers is None:
             raise click.ClickException("Operation cancelled")
+        
+        if has_many_issues:
+            console.print(f"\n[yellow]Displaying 10 issues by default. Use --limit argument if you want to see more.[/yellow]")
         
         return answers['issue']
         
