@@ -137,8 +137,7 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         questions = [
             inquirer.List('issue',
                          message="Select an issue",
-                         choices=issue_choices,
-                         carousel=True)
+                         choices=issue_choices)
         ]
         
         answers = inquirer.prompt(questions)
