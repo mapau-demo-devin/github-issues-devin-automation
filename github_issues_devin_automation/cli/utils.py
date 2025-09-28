@@ -135,20 +135,20 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         if not assignee_text:
             assignee_text = "N/A"
         
-        if len(labels_text) > 15:
-            labels_text = labels_text[:15] + "..."
+        if len(labels_text) > 18:
+            labels_text = labels_text[:18] + "..."
         
-        if len(milestone_text) > 22:
-            milestone_text = milestone_text[:22] + "..."
+        if len(milestone_text) > 25:
+            milestone_text = milestone_text[:25] + "..."
         
-        if len(assignee_text) > 15:
-            assignee_text = assignee_text[:12] + "..."
+        if len(assignee_text) > 18:
+            assignee_text = assignee_text[:18] + "..."
         
         title = str(issue['title'])
         if len(title) > 70:
             title = title[:70] + "..."
         
-        choice_text = f"#{issue['number']:<6} {title:<73} 🏷️  {labels_text:<18} 🎯 {milestone_text:<25} 👤 {assignee_text:<18}"
+        choice_text = f"#{issue['number']:<6} {title:<73} 🏷️  {labels_text:<21} 🎯 {milestone_text:<28} 👤 {assignee_text:<21}"
         issue_choices.append((choice_text, issue['number']))
     
     try:
