@@ -3,8 +3,11 @@ GitHub API client for fetching issues and repository information.
 """
 
 import requests
+import logging
 from typing import List, Dict, Any, Optional, Union
 from ..config.settings import get_github_token
+
+logger = logging.getLogger(__name__)
 
 class GitHubClient:
     def __init__(self):
@@ -15,7 +18,7 @@ class GitHubClient:
             'Accept': 'application/vnd.github.v3+json'
         }
     
-    def list_issues(self, repo: str, state: str = 'open', limit: int = 10, return_headers: bool = False, labels: Optional[str] = None, milestone: Optional[str] = None, assignee: Optional[str] = None) -> Union[List[Dict[Any, Any]], tuple[List[Dict[Any, Any]], Dict[str, str]]]:
+    def list_issues(self, repo: str, state: str = 'open', limit: int = 10, return_headers: bool = False, labels: Optional[str] = None, milestone: Optional[str] = None, assignee: Optional[str] = None, exclude_pull_requests: bool = True) -> Union[List[Dict[Any, Any]], tuple[List[Dict[Any, Any]], Dict[str, str]]]:
         """
         List issues from a GitHub repository.
         
@@ -27,6 +30,7 @@ class GitHubClient:
             labels: Comma-separated list of label names to filter by
             milestone: Milestone number, "*" for any, "none" for none
             assignee: Username, "*" for any assigned, "none" for unassigned
+            exclude_pull_requests: Whether to filter out pull requests (default: True)
         
         Returns:
             List of issue dictionaries, or tuple of (issues, headers) if return_headers=True
@@ -47,6 +51,7 @@ class GitHubClient:
             params['assignee'] = assignee
         
         response = requests.get(url, headers=self.headers, params=params)
+        
         
         if response.status_code == 422:
             error_data = response.json()
@@ -71,9 +76,14 @@ class GitHubClient:
         
         response.raise_for_status()
         
+        issues_data = response.json()
+        
+        if exclude_pull_requests:
+            issues_data = [issue for issue in issues_data if 'pull_request' not in issue]
+        
         if return_headers:
-            return response.json(), dict(response.headers)
-        return response.json()
+            return issues_data, dict(response.headers)
+        return issues_data
     
     def has_many_issues(self, repo: str, threshold: int = 10, state: str = 'open', labels: Optional[str] = None, milestone: Optional[str] = None, assignee: Optional[str] = None) -> bool:
         """
@@ -91,7 +101,9 @@ class GitHubClient:
             True if repo has more than threshold issues
         """
         issues, headers = self.list_issues(repo, state=state, limit=threshold + 1, return_headers=True, labels=labels, milestone=milestone, assignee=assignee)
-        return len(issues) > threshold or ('link' in headers and 'rel="next"' in headers['link'])
+        
+        has_next_page = 'link' in headers and 'rel="next"' in headers['link']
+        return len(issues) > threshold or has_next_page
     
     def get_issue(self, repo: str, issue_number: int) -> Dict[Any, Any]:
         """
