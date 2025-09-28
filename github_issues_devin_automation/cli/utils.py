@@ -105,10 +105,9 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         has_many_issues = github_client.has_many_issues(repo, threshold=10, state=state, labels=labels, milestone=milestone, assignee=assignee)
         if has_many_issues:
             limit = 10
+            issues = github_client.list_issues(repo, state=state, limit=limit, labels=labels, milestone=milestone, assignee=assignee)
         else:
-            limit = 50
-        
-        issues = github_client.list_issues(repo, state=state, limit=limit, labels=labels, milestone=milestone, assignee=assignee)
+            issues = github_client.list_issues(repo, state=state, limit=10, labels=labels, milestone=milestone, assignee=assignee)
     except ValueError as e:
         raise click.ClickException(str(e))
     
