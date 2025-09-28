@@ -154,7 +154,7 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         
         metadata_parts = []
         if labels_text:
-            metadata_parts.append(f"🏷️ {labels_text}")
+            metadata_parts.append(f"🏷️  {labels_text}")
         if milestone_text:
             metadata_parts.append(f"🎯 {milestone_text}")
         if assignee_text:
