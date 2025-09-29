@@ -232,7 +232,7 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
         """Extract confidence level from first message body, with session title as fallback"""
         try:
             import time
-            max_attempts = 24  # 2 minutes with 5-second intervals
+            max_attempts = 36  # 3 minutes with 5-second intervals to account for API delay
             
             for attempt in range(max_attempts):
                 session = self.get_session(session_id)
