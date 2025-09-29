@@ -132,3 +132,47 @@ class DevinClient:
         
         if last_exception:
             raise last_exception
+    
+    def wait_for_session_completion(self, session_id: str, timeout: int = 300, poll_interval: int = 5) -> Dict[Any, Any]:
+        """
+        Poll a session until it completes or times out.
+        
+        Args:
+            session_id: ID of the session to monitor
+            timeout: Maximum time to wait in seconds (default: 5 minutes)
+            poll_interval: Time between polls in seconds (default: 5 seconds)
+        
+        Returns:
+            Final session details dictionary
+            
+        Raises:
+            TimeoutError: If session doesn't complete within timeout
+            requests.exceptions.RequestException: If API calls fail
+        """
+        from rich.console import Console
+        from rich.live import Live
+        from rich.spinner import Spinner
+        
+        console = Console()
+        start_time = time.time()
+        
+        with Live(Spinner("dots", text="Waiting for Devin to complete analysis..."), console=console, refresh_per_second=4) as live:
+            while time.time() - start_time < timeout:
+                try:
+                    session = self.get_session(session_id)
+                    status = session.get('status_enum', session.get('status', 'unknown'))
+                    
+                    if status in ['finished', 'blocked', 'expired']:
+                        live.stop()
+                        return session
+                    elif status in ['working']:
+                        live.update(Spinner("dots", text=f"Devin is {status}..."))
+                    
+                    time.sleep(poll_interval)
+                    
+                except Exception as e:
+                    live.stop()
+                    raise e
+            
+            live.stop()
+            raise TimeoutError(f"Session {session_id} did not complete within {timeout} seconds")
