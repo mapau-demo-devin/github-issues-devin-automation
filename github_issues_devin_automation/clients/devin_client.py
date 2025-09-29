@@ -235,7 +235,7 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
             return None, None, None
 
     def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
-        """Extract confidence level from first message body"""
+        """Extract confidence level from session title (immediate) or message body (polling)"""
         try:
             import time
             max_attempts = 18  # 3 minutes with 10-second intervals to account for API delay
@@ -243,6 +243,13 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
             for attempt in range(max_attempts):
                 session = self.get_session(session_id)
                 status = session.get('status_enum', session.get('status', 'unknown'))
+                
+                title = session.get('title', '')
+                if title:
+                    confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', title, re.IGNORECASE)
+                    if confidence_match:
+                        return confidence_match.group(1).capitalize()
+                
                 messages = session.get('messages', [])
                 for message in messages:
                     msg_type = message.get('type', 'unknown')
