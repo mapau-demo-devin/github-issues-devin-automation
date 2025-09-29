@@ -34,6 +34,66 @@ cp .env.example .env
 python cli.py --help
 ```
 
+## Docker Deployment (Recommended for Easy Distribution)
+
+Docker provides the safest way to distribute this CLI tool while keeping API keys secure. Users provide their own API keys at runtime without them ever being included in the Docker image.
+
+### Prerequisites
+- Install Docker: [Get Docker](https://docs.docker.com/get-docker/)
+
+### For Users: Running the CLI with Docker
+
+1. **Get your API keys ready**:
+   - GitHub Token: Create at https://github.com/settings/tokens with `repo` scope
+   - Devin API Key: Obtain from your Devin AI account settings
+
+2. **Create a `.env` file** in your local directory:
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit .env with your actual API keys
+   # NEVER commit this file to version control!
+   ```
+
+3. **Build the Docker image**:
+   ```bash
+   docker build -t github-issues-cli .
+   ```
+
+4. **Run CLI commands**:
+   ```bash
+   # List issues
+   docker run --env-file .env github-issues-cli list-issues --repo microsoft/vscode
+   
+   # Scope an issue
+   docker run --env-file .env github-issues-cli scope-issue --repo microsoft/vscode --issue-number 123
+   
+   # Complete an issue
+   docker run --env-file .env github-issues-cli complete-issue --repo your-org/your-repo --issue-number 456
+   ```
+
+### How It Works (Security)
+
+- ✅ Your API keys stay in your local `.env` file
+- ✅ The `--env-file` flag passes keys to the container at runtime only
+- ✅ Keys are NEVER baked into the Docker image
+- ✅ `.dockerignore` ensures `.env` files are excluded from builds
+- ✅ Each user provides their own credentials
+
+### Troubleshooting Docker
+
+**Permission Denied**: On Linux, you may need to run Docker commands with `sudo` or add your user to the docker group:
+```bash
+sudo usermod -aG docker $USER
+# Log out and back in for changes to take effect
+```
+
+**Image Already Exists**: If you need to rebuild after changes:
+```bash
+docker build -t github-issues-cli . --no-cache
+```
+
 ## Configuration
 
 ### Required Environment Variables
