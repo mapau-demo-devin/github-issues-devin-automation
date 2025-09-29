@@ -134,7 +134,7 @@ class DevinClient:
         if last_exception:
             raise last_exception
 
-    def wait_for_session_completion(self, session_id: str, timeout: int = 300, poll_interval: int = 5) -> Dict[Any, Any]:
+    def wait_for_session_completion(self, session_id: str, timeout: int = 600, poll_interval: int = 5) -> Dict[Any, Any]:
         """
         Poll a session until it completes or times out.
 
