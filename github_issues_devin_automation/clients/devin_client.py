@@ -229,7 +229,7 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
             return None, None, None
 
     def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
-        """Extract confidence level from the first Devin message body"""
+        """Extract confidence level from first message body, with session title as fallback"""
         try:
             import time
             max_attempts = 24  # 2 minutes with 5-second intervals
@@ -238,6 +238,7 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
                 session = self.get_session(session_id)
                 status = session.get('status_enum', session.get('status', 'unknown'))
                 messages = session.get('messages', [])
+                title = session.get('title', '')
                 
                 for message in messages:
                     msg_type = message.get('type', 'unknown')
@@ -246,7 +247,11 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
                         confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', content, re.IGNORECASE)
                         if confidence_match:
                             return confidence_match.group(1).capitalize()
-                        break
+                
+                if title:
+                    confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', title, re.IGNORECASE)
+                    if confidence_match:
+                        return confidence_match.group(1).capitalize()
                 
                 if status in ['finished', 'blocked', 'expired']:
                     break
