@@ -217,21 +217,15 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
             confidence_level = self._extract_initial_confidence(session_id)
             if confidence_level:
                 console.print(f"[yellow]Initial Assessment: {confidence_level}[/yellow]")
-            else:
-                console.print(f"[yellow]No confidence level extracted from initial messages[/yellow]")
             
             console.print(f"[blue]Waiting for Devin to complete issue scoping...[/blue]")
             completed_session = self.wait_for_session_completion(session_id)
             full_analysis = self._extract_full_analysis(completed_session)
 
-            console.print(f"[dim]Debug: confidence_level={confidence_level}, full_analysis length={len(full_analysis) if full_analysis else 0}[/dim]")
-
             return confidence_level, full_analysis, session_id
 
         except Exception as e:
             console.print(f"[red]Error during AI analysis: {e}[/red]")
-            import traceback
-            console.print(f"[red]Traceback: {traceback.format_exc()}[/red]")
             return None, None, None
 
     def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
