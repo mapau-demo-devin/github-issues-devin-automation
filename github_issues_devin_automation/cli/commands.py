@@ -22,30 +22,6 @@ from .utils import (
 )
 
 
-def explain_confidence_score(score, factors):
-    """Generate explanation for the confidence score"""
-    if score >= 8.0:
-        level = "Very High"
-        color = "bright_green"
-        description = "This issue appears straightforward to implement with clear requirements."
-    elif score >= 6.0:
-        level = "High"
-        color = "green"
-        description = "This issue has good clarity and should be manageable to implement."
-    elif score >= 4.0:
-        level = "Medium"
-        color = "yellow"
-        description = "This issue may require some investigation or have moderate complexity."
-    elif score >= 2.0:
-        level = "Low"
-        color = "orange"
-        description = "This issue appears complex or lacks sufficient detail."
-    else:
-        level = "Very Low"
-        color = "red"
-        description = "This issue is likely very complex or poorly defined."
-
-    return level, color, description
 
 @click.group()
 def cli():
@@ -147,26 +123,28 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
         from ..clients.devin_client import DevinClient
         devin_client = DevinClient()
         
-        score, factors, reasoning, session_id = devin_client.calculate_confidence_score_with_ai(issue)
+        confidence_level, full_analysis, session_id = devin_client.calculate_confidence_score_with_ai(issue)
         
-        if score is None:
-            console.print(f"[red]Failed to analyze issue with AI. Unable to extract confidence score from Devin session.[/red]")
+        if confidence_level is None:
+            console.print(f"[red]Failed to analyze issue with AI. Unable to extract confidence assessment from Devin session.[/red]")
             console.print(f"[yellow]Please try again or check the issue description for clarity.[/yellow]")
             return
 
-        level, color, description = explain_confidence_score(score, factors)
+        if confidence_level.lower() == 'high':
+            color = "green"
+        elif confidence_level.lower() == 'medium':
+            color = "yellow"
+        else:  # low
+            color = "red"
 
-        score_panel = Panel(
-            f"[bold {color}]{level} Confidence ({score}/10)[/bold {color}]\n\n"
-            f"{description}\n\n"
-            f"[dim]AI Analysis:[/dim]\n{reasoning}\n\n"
-            f"[dim]Key factors:[/dim]\n" +
-            "\n".join([f"• {factor}" for factor in factors]) +
-            (f"\n\n[dim]Scoping session: {session_id}[/dim]" if session_id else ""),
-            title="🎯 AI-Powered Confidence Score",
+        analysis_panel = Panel(
+            f"[bold {color}]{confidence_level} Confidence[/bold {color}]\n\n"
+            f"[dim]AI Analysis:[/dim]\n{full_analysis}\n\n" +
+            (f"[dim]Scoping session: {session_id}[/dim]" if session_id else ""),
+            title="🎯 AI-Powered Issue Scoping",
             border_style=color
         )
-        console.print(score_panel)
+        console.print(analysis_panel)
 
         console.print(f"\n[yellow]Would you like to create a separate Devin session to implement this issue?[/yellow]")
         user_input = click.prompt("Create implementation session? (y/N)", default="n", show_default=True)
@@ -180,10 +158,9 @@ Issue: {issue['title']}
 Description: {issue['body']}
 Repository: {repo}
 
-AI Confidence Analysis:
-- Score: {score}/10 ({level})
-- Key factors: {', '.join(factors[:3])}
-- Reasoning: {reasoning}
+AI Scoping Analysis:
+- Confidence Level: {confidence_level}
+- Analysis: {full_analysis[:200]}...
 
 Steps:
 1. Clone the repository
@@ -198,9 +175,8 @@ Note: This is an implementation session. Please create a working solution and PR
                 repo,
                 issue_number,
                 implementation_prompt,
-                score=score,
-                level=level,
-                ai_analysis=reasoning
+                confidence_level=confidence_level,
+                ai_analysis=full_analysis
             )
         else:
             console.print("[dim]Skipping implementation session creation.[/dim]")

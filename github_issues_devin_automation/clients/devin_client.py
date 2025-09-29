@@ -178,47 +178,31 @@ class DevinClient:
             live.stop()
             raise TimeoutError(f"Session {session_id} did not complete within {timeout} seconds")
 
-    def calculate_confidence_score_with_ai(self, issue: Dict[Any, Any]) -> Tuple[Optional[float], Optional[list], Optional[str], Optional[str]]:
+    def calculate_confidence_score_with_ai(self, issue: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
-        Calculate confidence score for issue implementation using Devin AI (1-10 scale).
-        Higher score = higher confidence (easier to implement)
+        Scope GitHub issue using Devin AI and extract confidence level.
         
         Args:
             issue: GitHub issue dictionary
             
         Returns:
-            Tuple of (score, factors, reasoning, session_id) or (None, None, None, None) if failed
+            Tuple of (confidence_level, full_analysis, session_id) or (None, None, None) if failed
         """
         from rich.console import Console
         
         console = Console()
-        console.print(f"[blue]Creating Devin session to analyze issue complexity...[/blue]")
+        console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        scoping_prompt = f"""Please analyze and scope this GitHub issue and provide a confidence score for implementation difficulty.
+        scoping_prompt = f"""Please scope this GitHub issue and analyze its implementation complexity.
 
 Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
 Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
-Please provide your analysis in this exact format:
+Please start your response with a confidence assessment in this format:
+Confidence: [High/Medium/Low]
 
-CONFIDENCE SCORE: [number from 1-10]
-CONFIDENCE LEVEL: [Very Low/Low/Medium/High/Very High]
-
-ANALYSIS FACTORS:
-- [Factor 1 explanation]
-- [Factor 2 explanation]
-- [Factor 3 explanation]
-
-REASONING:
-[Brief explanation of the score]
-
-Note:
-- Score 1-2: Very complex, architectural changes, poorly defined
-- Score 3-4: Complex, requires significant investigation
-- Score 5-6: Moderate complexity, some unknowns
-- Score 7-8: Well-defined, straightforward implementation
-- Score 9-10: Simple fixes, documentation changes
+Then provide your detailed analysis of the issue scope, complexity factors, and implementation considerations.
 
 Do NOT create any pull requests or implement solutions. This is only for scoping and analysis."""
 
@@ -229,61 +213,50 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
             console.print(f"[green]Created scoping session: {session_id}[/green]")
             console.print(f"[dim]Session URL: {session['url']}[/dim]")
 
+            confidence_level = self._extract_initial_confidence(session_id)
+            if confidence_level:
+                console.print(f"[yellow]Initial Assessment: {confidence_level}[/yellow]")
+            
             completed_session = self.wait_for_session_completion(session_id)
+            full_analysis = self._extract_full_analysis(completed_session)
 
-            score, factors, reasoning = self._extract_confidence_from_session(completed_session)
-
-            return score, factors, reasoning, session_id
+            return confidence_level, full_analysis, session_id
 
         except Exception as e:
             console.print(f"[red]Error during AI analysis: {e}[/red]")
-            return None, None, None, None
+            return None, None, None
 
-    def _extract_confidence_from_session(self, session: Dict[Any, Any]) -> Tuple[Optional[float], list, str]:
-        """Extract confidence score and analysis from completed Devin session"""
+    def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
+        """Extract confidence level from the first Devin message"""
+        try:
+            import time
+            max_attempts = 12  # 1 minute with 5-second intervals
+            for _ in range(max_attempts):
+                session = self.get_session(session_id)
+                messages = session.get('messages', [])
+                
+                for message in messages:
+                    if message.get('type') == 'devin_message':
+                        content = message.get('message', '')
+                        confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', content, re.IGNORECASE)
+                        if confidence_match:
+                            return confidence_match.group(1).capitalize()
+                
+                time.sleep(5)
+            
+            return None
+            
+        except Exception:
+            return None
+
+    def _extract_full_analysis(self, session: Dict[Any, Any]) -> str:
+        """Extract the full analysis from completed Devin session"""
         messages = session.get('messages', [])
 
         for message in reversed(messages):
             if message.get('type') == 'devin_message':
                 content = message.get('message', '')
+                if content.strip():
+                    return content
 
-                score = self._parse_confidence_score(content)
-                factors = self._parse_analysis_factors(content)
-                reasoning = self._parse_reasoning(content)
-
-                if score is not None:
-                    return score, factors, reasoning
-
-        return None, ["AI analysis completed but score parsing failed"], "Unable to parse Devin's response"
-
-    def _parse_confidence_score(self, content: str) -> Optional[float]:
-        """Parse confidence score from Devin's response"""
-        score_match = re.search(r'CONFIDENCE SCORE:\s*(\d+(?:\.\d+)?)', content, re.IGNORECASE)
-        if score_match:
-            try:
-                score = float(score_match.group(1))
-                return max(1.0, min(10.0, score))
-            except ValueError:
-                pass
-
-        return None
-
-    def _parse_analysis_factors(self, content: str) -> list:
-        """Parse analysis factors from Devin's response"""
-        factors = []
-
-        factors_match = re.search(r'ANALYSIS FACTORS:(.*?)(?:REASONING:|$)', content, re.IGNORECASE | re.DOTALL)
-        if factors_match:
-            factors_text = factors_match.group(1)
-            factor_lines = re.findall(r'-\s*(.+)', factors_text)
-            factors = [factor.strip() for factor in factor_lines if factor.strip()]
-
-        return factors if factors else ["AI analysis factors not parsed"]
-
-    def _parse_reasoning(self, content: str) -> str:
-        """Parse reasoning from Devin's response"""
-        reasoning_match = re.search(r'REASONING:\s*(.*?)$', content, re.IGNORECASE | re.DOTALL)
-        if reasoning_match:
-            return reasoning_match.group(1).strip()
-
-        return "AI reasoning not parsed"
+        return "Unable to extract analysis from Devin's response"
