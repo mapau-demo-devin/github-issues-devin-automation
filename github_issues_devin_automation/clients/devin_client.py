@@ -213,10 +213,12 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
             console.print(f"[green]Created scoping session: {session_id}[/green]")
             console.print(f"[dim]Session URL: {session['url']}[/dim]")
 
+            console.print(f"[blue]Waiting for Devin to assign a confidence score...[/blue]")
             confidence_level = self._extract_initial_confidence(session_id)
             if confidence_level:
                 console.print(f"[yellow]Initial Assessment: {confidence_level}[/yellow]")
             
+            console.print(f"[blue]Waiting for Devin to complete issue scoping...[/blue]")
             completed_session = self.wait_for_session_completion(session_id)
             full_analysis = self._extract_full_analysis(completed_session)
 
