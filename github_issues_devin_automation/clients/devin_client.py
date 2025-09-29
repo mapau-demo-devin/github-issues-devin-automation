@@ -193,18 +193,17 @@ class DevinClient:
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        scoping_prompt = f"""Please scope this GitHub issue and analyze its implementation complexity.
+        scoping_prompt = f"""Please provide a quick scoping assessment for this GitHub issue.
 
 Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
 Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
-Please start your response with a confidence assessment in this format:
-Confidence: [High/Medium/Low]
+Please respond with:
+1. Confidence: [High/Medium/Low] - your confidence in implementing this
+2. Brief analysis (2-3 sentences) covering scope and complexity
 
-Then provide your detailed analysis of the issue scope, complexity factors, and implementation considerations.
-
-Do NOT create any pull requests or implement solutions. This is only for scoping and analysis."""
+Keep your response concise and focused. Do NOT create pull requests or implement solutions."""
 
         try:
             session = self.create_session(scoping_prompt)
