@@ -229,20 +229,39 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
             return None, None, None
 
     def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
-        """Extract confidence level from the first Devin message"""
+        """Extract confidence level from session title, structured output, or message content"""
         try:
             import time
-            max_attempts = 12  # 1 minute with 5-second intervals
-            for _ in range(max_attempts):
+            max_attempts = 24  # 2 minutes with 5-second intervals
+            
+            for attempt in range(max_attempts):
                 session = self.get_session(session_id)
+                status = session.get('status_enum', session.get('status', 'unknown'))
                 messages = session.get('messages', [])
+                structured_output = session.get('structured_output', {})
+                title = session.get('title', '')
+                
+                if title:
+                    confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', title, re.IGNORECASE)
+                    if confidence_match:
+                        return confidence_match.group(1).capitalize()
+                
+                if structured_output and 'confidence_statement' in structured_output:
+                    confidence_statement = structured_output['confidence_statement']
+                    confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', confidence_statement, re.IGNORECASE)
+                    if confidence_match:
+                        return confidence_match.group(1).capitalize()
                 
                 for message in messages:
-                    if message.get('type') == 'devin_message':
+                    msg_type = message.get('type', 'unknown')
+                    if msg_type == 'devin_message':
                         content = message.get('message', '')
                         confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', content, re.IGNORECASE)
                         if confidence_match:
                             return confidence_match.group(1).capitalize()
+                
+                if status in ['finished', 'blocked', 'expired']:
+                    break
                 
                 time.sleep(5)
             
@@ -254,7 +273,7 @@ Do NOT create any pull requests or implement solutions. This is only for scoping
     def _extract_full_analysis(self, session: Dict[Any, Any]) -> str:
         """Extract the full analysis from completed Devin session"""
         messages = session.get('messages', [])
-
+        
         for message in reversed(messages):
             if message.get('type') == 'devin_message':
                 content = message.get('message', '')
