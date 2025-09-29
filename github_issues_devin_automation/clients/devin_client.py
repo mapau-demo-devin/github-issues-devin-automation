@@ -199,7 +199,10 @@ Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
 Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
-Please provide your detailed analysis of the issue scope, complexity factors, and implementation considerations.
+Please start your response with a confidence assessment in this format:
+Confidence: [High/Medium/Low]
+
+Then provide your detailed analysis of the issue scope, complexity factors, and implementation considerations.
 
 Do NOT create any pull requests or implement solutions. This is only for scoping and analysis."""
 
