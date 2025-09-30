@@ -186,121 +186,124 @@ class DevinClient:
             issue: GitHub issue dictionary
             
         Returns:
-            Tuple of (confidence_level, full_analysis, session_id) or (None, None, None) if failed
+            Tuple of (confidence_level, brief_analysis, session_id) or (None, None, None) if failed
         """
         from rich.console import Console
         
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        scoping_prompt = f"""Analyze and scope this GitHub issue and provide a confidence assessment. **UPDATE THE STRUCTURED OUTPUT IMMEDIATELY** when you determine your confidence level.
+        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. **RESPOND AS FAST AS POSSIBLE** with your initial assessment.
 
 Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
 Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
-**STRUCTURED OUTPUT SCHEMA - Update this in two phases:**
+**STRUCTURED OUTPUT SCHEMA - Update this IMMEDIATELY:**
 {{
   "confidence_level": "High|Medium|Low",
-  "brief_analysis": "2-3 sentence analysis of scope and complexity",
-  "implementation_estimate": "Brief time estimate (hours/days/weeks)",
-  "detailed_scope": "Comprehensive scope analysis (only update after completing detailed analysis)"
+  "brief_analysis": "2-3 sentence analysis of scope and complexity"
 }}
 
 **INSTRUCTIONS:**
 1. Read the issue carefully
 2. **IMMEDIATELY update the structured output** with your confidence assessment and brief_analysis
-3. Provide a brief response with "Confidence: [High/Medium/Low]" 
-4. Keep initial analysis concise (2-3 sentences maximum)
-5. Once you complete the above, provide a comprehensive detailed scope assessment including:
-   - Detailed implementation approach
-   - Potential challenges and edge cases
-   - Testing considerations
-   - Time breakdown by component
-6. **UPDATE the structured output's detailed_scope field** when you complete the detailed analysis
-7. Do NOT create pull requests or implement solutions
+3. Keep your analysis concise (2-3 sentences maximum)
+4. Do NOT provide detailed analysis yet - just initial assessment
+5. Do NOT create pull requests or implement solutions
 
-**CRITICAL: Update the structured output immediately for initial assessment, then again after completing the detailed scope analysis.**"""
+**CRITICAL: Respond as fast as possible with just the initial confidence and brief analysis.**"""
 
         try:
-            session = self.create_session(scoping_prompt)
+            session = self.create_session(initial_prompt)
             session_id = session['session_id']
 
             console.print(f"[green]Created scoping session: {session_id}[/green]")
             console.print(f"[dim]Session URL: {session['url']}[/dim]")
 
             console.print(f"[blue]Waiting for Devin to assign a confidence score...[/blue]")
-            confidence_level = self._extract_initial_confidence(session_id)
-            if confidence_level:
-                console.print(f"[yellow]Initial Assessment: {confidence_level}[/yellow]")
+            confidence_level, brief_analysis = self._extract_initial_confidence(session_id)
             
-            console.print(f"[blue]Waiting for Devin to complete issue scoping...[/blue]")
-            completed_session = self.wait_for_session_completion(session_id)
-            full_analysis = self._extract_full_analysis(completed_session)
+            if not confidence_level or not brief_analysis:
+                console.print(f"[red]Failed to extract initial assessment[/red]")
+                return None, None, None
+            
+            detailed_analysis_prompt = """Now that you've provided the initial assessment, please provide a comprehensive detailed scope analysis.
 
-            return confidence_level, full_analysis, session_id
+**STRUCTURED OUTPUT SCHEMA - Update when detailed analysis is ready:**
+{{
+  "detailed_analysis": "Comprehensive detailed scope analysis"
+}}
+
+**INSTRUCTIONS FOR DETAILED ANALYSIS:**
+1. Provide a comprehensive detailed scope assessment including:
+   - Detailed implementation approach
+   - Potential challenges and edge cases
+   - Testing considerations
+   - Files/components that need to be modified
+   - Time breakdown by component
+2. **UPDATE the structured output's detailed_analysis field** when you complete the analysis
+3. Do NOT create pull requests or implement solutions
+
+**Take your time to be thorough and comprehensive.**"""
+            
+            self.send_message(session_id, detailed_analysis_prompt)
+
+            return confidence_level, brief_analysis, session_id
 
         except Exception as e:
             console.print(f"[red]Error during AI analysis: {e}[/red]")
             return None, None, None
 
-    def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
-        """Extract confidence level from structured output (immediate) with fallback to session title"""
+    def _extract_initial_confidence(self, session_id: str) -> Tuple[Optional[str], Optional[str]]:
+        """Extract confidence level and brief analysis from structured output.
+        
+        Args:
+            session_id: ID of the session to monitor
+            
+        Returns:
+            Tuple of (confidence_level, brief_analysis) or (None, None) if failed
+        """
         try:
             import time
-            max_attempts = 200  # 3 minutes with 15-second intervals (recommended by API docs)
+            max_attempts = 200  # Allow up to ~30 minutes with 10-second intervals
             
             for attempt in range(max_attempts):
                 session = self.get_session(session_id)
                 status = session.get('status_enum', session.get('status', 'unknown'))
                 
                 structured_output = session.get('structured_output', {})
-                if structured_output and 'confidence_level' in structured_output:
+                if structured_output and 'confidence_level' in structured_output and 'brief_analysis' in structured_output:
                     confidence = structured_output['confidence_level']
-                    if confidence in ['High', 'Medium', 'Low']:
-                        return confidence
+                    brief_analysis = structured_output['brief_analysis']
+                    if confidence in ['High', 'Medium', 'Low'] and brief_analysis and brief_analysis.strip():
+                        return confidence, brief_analysis
                 
                 if status in ['finished', 'blocked', 'expired']:
                     break
                 
-                time.sleep(10)  # Use recommended 15-second intervals
+                time.sleep(10)
             
-            return None
+            return None, None
             
         except Exception:
-            return None
+            return None, None
 
-    def _extract_full_analysis(self, session: Dict[Any, Any]) -> str:
-        """Extract the full analysis from structured output or completed Devin session"""
-        structured_output = session.get('structured_output', {})
-        if structured_output and 'brief_analysis' in structured_output:
-            analysis = structured_output['brief_analysis']
-            if analysis and analysis.strip():
-                return analysis
-        
-        messages = session.get('messages', [])
-        for message in reversed(messages):
-            if message.get('type') == 'devin_message':
-                content = message.get('message', '')
-                if content.strip():
-                    return content
 
-        return "Unable to extract analysis from Devin's response"
-
-    def wait_for_detailed_scope(self, session_id: str, timeout: int = 300, poll_interval: int = 10) -> Optional[str]:
+    def wait_for_detailed_scope(self, session_id: str, timeout: int = 600, poll_interval: int = 10) -> Optional[str]:
         """
-        Poll a scoping session until detailed scope is available in structured output.
+        Poll a scoping session until detailed analysis is available in structured output.
 
         Args:
             session_id: ID of the session to monitor
-            timeout: Maximum time to wait in seconds (default: 5 minutes)
+            timeout: Maximum time to wait in seconds (default: 10 minutes)
             poll_interval: Time between polls in seconds (default: 10 seconds)
 
         Returns:
-            Detailed scope string or None if not available
+            Detailed analysis string or None if not available
 
         Raises:
-            TimeoutError: If detailed scope doesn't become available within timeout
+            TimeoutError: If detailed analysis doesn't become available within timeout
         """
         from rich.console import Console
         from rich.live import Live
@@ -315,11 +318,11 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                     session = self.get_session(session_id)
                     structured_output = session.get('structured_output', {})
                     
-                    if structured_output and 'detailed_scope' in structured_output:
-                        detailed_scope = structured_output['detailed_scope']
-                        if detailed_scope and detailed_scope.strip():
+                    if structured_output and 'detailed_analysis' in structured_output:
+                        detailed_analysis = structured_output['detailed_analysis']
+                        if detailed_analysis and detailed_analysis.strip():
                             live.stop()
-                            return detailed_scope
+                            return detailed_analysis
                     
                     status = session.get('status_enum', session.get('status', 'unknown'))
                     if status in ['finished', 'blocked', 'expired']:
@@ -333,7 +336,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                     raise e
 
             live.stop()
-            raise TimeoutError(f"Detailed scope did not become available within {timeout} seconds")
+            raise TimeoutError(f"Detailed analysis did not become available within {timeout} seconds")
     
     def _extract_detailed_from_messages(self, session: Dict[Any, Any]) -> str:
         """Extract detailed scope from session messages if not in structured output."""

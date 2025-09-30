@@ -124,7 +124,7 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
         from ..clients.devin_client import DevinClient
         devin_client = DevinClient()
         
-        confidence_level, full_analysis, session_id = devin_client.calculate_confidence_score_with_ai(issue)
+        confidence_level, brief_analysis, session_id = devin_client.calculate_confidence_score_with_ai(issue)
         
         if confidence_level is None:
             console.print(f"[red]Failed to analyze issue with AI. Unable to extract confidence assessment from Devin session.[/red]")
@@ -140,7 +140,7 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
 
         analysis_panel = Panel(
             f"[bold {color}]{confidence_level} Confidence[/bold {color}]\n\n"
-            f"[dim]AI Analysis:[/dim]\n{full_analysis}\n\n" +
+            f"[dim]AI Analysis:[/dim]\n{brief_analysis}\n\n" +
             (f"[dim]Scoping session: {session_id}[/dim]" if session_id else ""),
             title="🎯 AI-Powered Issue Scoping",
             border_style=color
@@ -207,7 +207,7 @@ Repository: {repo}
 
 AI Scoping Analysis:
 - Confidence Level: {confidence_level}
-- Analysis: {full_analysis[:200]}...
+- Analysis: {brief_analysis[:200]}...
 
 Steps:
 1. Clone the repository
@@ -223,7 +223,7 @@ Note: This is an implementation session. Please create a working solution and PR
                 issue_number,
                 implementation_prompt,
                 confidence_level=confidence_level,
-                ai_analysis=full_analysis
+                ai_analysis=brief_analysis
             )
 
     except requests.exceptions.HTTPError as e:
