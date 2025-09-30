@@ -193,15 +193,23 @@ class DevinClient:
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        scoping_prompt = f"""Please provide a quick scoping assessment for this GitHub issue.
+        scoping_prompt = f"""Please provide a quick scoping assessment for this GitHub issue and update the structured output immediately with your findings.
 
 Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
 Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
+Please update the structured output in this exact JSON format as soon as you determine your confidence:
+{{
+  "confidence": "High|Medium|Low",
+  "analysis": "Brief 2-3 sentence analysis covering scope and complexity"
+}}
+
 Please respond with:
 1. Confidence: [High/Medium/Low] - your confidence in implementing this
 2. Brief analysis (2-3 sentences) covering scope and complexity
+
+**IMPORTANT: Update the structured output immediately when you determine your confidence level.**
 
 Keep your response concise and focused. Do NOT create pull requests or implement solutions."""
 
@@ -228,14 +236,20 @@ Keep your response concise and focused. Do NOT create pull requests or implement
             return None, None, None
 
     def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
-        """Extract confidence level from session title (immediate) or message body (polling)"""
+        """Extract confidence level from structured output (immediate) with fallback to session title"""
         try:
             import time
-            max_attempts = 18  # 3 minutes with 10-second intervals to account for API delay
+            max_attempts = 12  # 3 minutes with 15-second intervals (recommended by API docs)
             
             for attempt in range(max_attempts):
                 session = self.get_session(session_id)
                 status = session.get('status_enum', session.get('status', 'unknown'))
+                
+                structured_output = session.get('structured_output', {})
+                if structured_output and 'confidence' in structured_output:
+                    confidence = structured_output['confidence']
+                    if confidence in ['High', 'Medium', 'Low']:
+                        return confidence
                 
                 title = session.get('title', '')
                 if title:
@@ -243,19 +257,10 @@ Keep your response concise and focused. Do NOT create pull requests or implement
                     if confidence_match:
                         return confidence_match.group(1).capitalize()
                 
-                messages = session.get('messages', [])
-                for message in messages:
-                    msg_type = message.get('type', 'unknown')
-                    if msg_type == 'devin_message':
-                        content = message.get('message', '')
-                        confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', content, re.IGNORECASE)
-                        if confidence_match:
-                            return confidence_match.group(1).capitalize()
-                
                 if status in ['finished', 'blocked', 'expired']:
                     break
                 
-                time.sleep(10)
+                time.sleep(15)  # Use recommended 15-second intervals
             
             return None
             
@@ -263,9 +268,14 @@ Keep your response concise and focused. Do NOT create pull requests or implement
             return None
 
     def _extract_full_analysis(self, session: Dict[Any, Any]) -> str:
-        """Extract the full analysis from completed Devin session"""
-        messages = session.get('messages', [])
+        """Extract the full analysis from structured output or completed Devin session"""
+        structured_output = session.get('structured_output', {})
+        if structured_output and 'analysis' in structured_output:
+            analysis = structured_output['analysis']
+            if analysis and analysis.strip():
+                return analysis
         
+        messages = session.get('messages', [])
         for message in reversed(messages):
             if message.get('type') == 'devin_message':
                 content = message.get('message', '')
