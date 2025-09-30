@@ -193,7 +193,7 @@ class DevinClient:
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        scoping_prompt = f"""Analyze this GitHub issue and provide a confidence assessment. **UPDATE THE STRUCTURED OUTPUT IMMEDIATELY** when you determine your confidence level.
+        scoping_prompt = f"""Analyze and scope this GitHub issue and provide a confidence assessment. **UPDATE THE STRUCTURED OUTPUT IMMEDIATELY** when you determine your confidence level.
 
 Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
@@ -210,8 +210,9 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
 1. Read the issue carefully
 2. **IMMEDIATELY update the structured output** with your confidence assessment
 3. Provide a brief response with "Confidence: [High/Medium/Low]" 
-4. Keep analysis concise (2-3 sentences maximum)
-5. Do NOT create pull requests or implement solutions
+4. Keep analysis concise (2-3 sentences maximum). 
+5. Once you are done with the above, provide a longer scope assessment. 
+6. Do NOT create pull requests or implement solutions
 
 **CRITICAL: Update the structured output as soon as you form an opinion about the confidence level. Do not wait until the end of your analysis.**"""
 
@@ -241,28 +242,23 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
         """Extract confidence level from structured output (immediate) with fallback to session title"""
         try:
             import time
-            max_attempts = 12  # 3 minutes with 15-second intervals (recommended by API docs)
+            max_attempts = 200  # 3 minutes with 15-second intervals (recommended by API docs)
             
             for attempt in range(max_attempts):
                 session = self.get_session(session_id)
                 status = session.get('status_enum', session.get('status', 'unknown'))
                 
                 structured_output = session.get('structured_output', {})
+                print(structured_output)
                 if structured_output and 'confidence_level' in structured_output:
                     confidence = structured_output['confidence_level']
                     if confidence in ['High', 'Medium', 'Low']:
                         return confidence
                 
-                title = session.get('title', '')
-                if title:
-                    confidence_match = re.search(r'Confidence:\s*(High|Medium|Low)', title, re.IGNORECASE)
-                    if confidence_match:
-                        return confidence_match.group(1).capitalize()
-                
                 if status in ['finished', 'blocked', 'expired']:
                     break
                 
-                time.sleep(15)  # Use recommended 15-second intervals
+                time.sleep(10)  # Use recommended 15-second intervals
             
             return None
             
