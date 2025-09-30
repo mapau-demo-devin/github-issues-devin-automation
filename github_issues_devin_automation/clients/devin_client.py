@@ -193,7 +193,7 @@ class DevinClient:
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. **RESPOND AS FAST AS POSSIBLE** with your initial assessment.
+        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. **UPDATE THE STRUCTURED OUTPUT IMMEDIATELY** as soon as you determine your confidence level and scope.
 
 Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
@@ -207,12 +207,12 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
 
 **INSTRUCTIONS:**
 1. Read the issue carefully
-2. **IMMEDIATELY update the structured output** with your confidence assessment and brief_analysis
+2. **AS SOON AS you determine your confidence level and scope, IMMEDIATELY update the structured output** with your confidence assessment and brief_analysis
 3. Keep your analysis concise (2-3 sentences maximum)
 4. Do NOT provide detailed analysis yet - just initial assessment
 5. Do NOT create pull requests or implement solutions
 
-**CRITICAL: Respond as fast as possible with just the initial confidence and brief analysis.**"""
+**CRITICAL: Update the structured output immediately as soon as you have determined the confidence level and brief scope. Respond as fast as possible.**"""
 
         try:
             session = self.create_session(initial_prompt)
@@ -232,7 +232,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
 
 **STRUCTURED OUTPUT SCHEMA - Update when detailed analysis is ready:**
 {{
-  "detailed_analysis": "Comprehensive detailed scope analysis"
+  "detailed_scope_analysis": "Comprehensive detailed scope analysis"
 }}
 
 **INSTRUCTIONS FOR DETAILED ANALYSIS:**
@@ -242,7 +242,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
    - Testing considerations
    - Files/components that need to be modified
    - Time breakdown by component
-2. **UPDATE the structured output's detailed_analysis field** when you complete the analysis
+2. **UPDATE the structured output's detailed_scope_analysis field** when you complete the analysis
 3. Do NOT create pull requests or implement solutions
 
 **Take your time to be thorough and comprehensive.**"""
@@ -292,7 +292,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
 
     def wait_for_detailed_scope(self, session_id: str, timeout: int = 600, poll_interval: int = 10) -> Optional[str]:
         """
-        Poll a scoping session until detailed analysis is available in structured output.
+        Poll a scoping session until detailed scope analysis is available in structured output.
 
         Args:
             session_id: ID of the session to monitor
@@ -300,10 +300,10 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             poll_interval: Time between polls in seconds (default: 10 seconds)
 
         Returns:
-            Detailed analysis string or None if not available
+            Detailed scope analysis string or None if not available
 
         Raises:
-            TimeoutError: If detailed analysis doesn't become available within timeout
+            TimeoutError: If detailed scope analysis doesn't become available within timeout
         """
         from rich.console import Console
         from rich.live import Live
@@ -311,6 +311,10 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
 
         console = Console()
         start_time = time.time()
+        
+        initial_session = self.get_session(session_id)
+        initial_structured_output = initial_session.get('structured_output', {})
+        initial_brief = initial_structured_output.get('brief_analysis', '')
 
         with Live(Spinner("dots", text="Waiting for detailed scope analysis from Devin..."), console=console, refresh_per_second=4) as live:
             while time.time() - start_time < timeout:
@@ -318,11 +322,13 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                     session = self.get_session(session_id)
                     structured_output = session.get('structured_output', {})
                     
-                    if structured_output and 'detailed_analysis' in structured_output:
-                        detailed_analysis = structured_output['detailed_analysis']
-                        if detailed_analysis and detailed_analysis.strip():
+                    if structured_output and 'detailed_scope_analysis' in structured_output:
+                        detailed_scope_analysis = structured_output['detailed_scope_analysis']
+                        if (detailed_scope_analysis and 
+                            detailed_scope_analysis.strip() and 
+                            detailed_scope_analysis != initial_brief):
                             live.stop()
-                            return detailed_analysis
+                            return detailed_scope_analysis
                     
                     status = session.get('status_enum', session.get('status', 'unknown'))
                     if status in ['finished', 'blocked', 'expired']:
@@ -336,7 +342,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                     raise e
 
             live.stop()
-            raise TimeoutError(f"Detailed analysis did not become available within {timeout} seconds")
+            raise TimeoutError(f"Detailed scope analysis did not become available within {timeout} seconds")
     
     def _extract_detailed_from_messages(self, session: Dict[Any, Any]) -> str:
         """Extract detailed scope from session messages if not in structured output."""
