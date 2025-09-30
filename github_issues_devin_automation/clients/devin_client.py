@@ -249,7 +249,6 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                 status = session.get('status_enum', session.get('status', 'unknown'))
                 
                 structured_output = session.get('structured_output', {})
-                print(structured_output)
                 if structured_output and 'confidence_level' in structured_output:
                     confidence = structured_output['confidence_level']
                     if confidence in ['High', 'Medium', 'Low']:
