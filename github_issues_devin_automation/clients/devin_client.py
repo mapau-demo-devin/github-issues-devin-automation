@@ -193,17 +193,15 @@ class DevinClient:
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. **RESPOND AS FAST AS POSSIBLE** with your initial assessment.
-
-Issue Title: {issue.get('title', '')}
-Issue Body: {issue.get('body', '') or 'No description provided'}
-Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
-
-**STRUCTURED OUTPUT SCHEMA - Update this IMMEDIATELY:**
+        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. Please update the structured output immediately when you assign a confidence score and brief_analysis. Use the following format for the structured_output:.
 {{
   "confidence_level": "High|Medium|Low",
   "brief_analysis": "2-3 sentence analysis of scope and complexity"
 }}
+
+Issue Title: {issue.get('title', '')}
+Issue Body: {issue.get('body', '') or 'No description provided'}
+Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
 **INSTRUCTIONS:**
 1. Read the issue carefully
@@ -228,11 +226,11 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                 console.print(f"[red]Failed to extract initial assessment[/red]")
                 return None, None, None
             
-            detailed_analysis_prompt = """Now that you've provided the initial assessment, please provide a comprehensive detailed scope analysis.
-
-**STRUCTURED OUTPUT SCHEMA - Update when detailed analysis is ready:**
+            detailed_analysis_prompt = f"""Now that you've provided the initial assessment, please provide a comprehensive detailed scope analysis using the following structured_output schema:
 {{
   "detailed_analysis": "Comprehensive detailed scope analysis"
+  "implementation_approach": "Detailed implementation approach"
+  "testing_considerations": "Testing considerations"
 }}
 
 **INSTRUCTIONS FOR DETAILED ANALYSIS:**
@@ -266,7 +264,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
         """
         try:
             import time
-            max_attempts = 200  # Allow up to ~30 minutes with 10-second intervals
+            max_attempts = 10  # Allow up to ~30 minutes with 10-second intervals
             
             for attempt in range(max_attempts):
                 session = self.get_session(session_id)
@@ -278,11 +276,10 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                     brief_analysis = structured_output['brief_analysis']
                     if confidence in ['High', 'Medium', 'Low'] and brief_analysis and brief_analysis.strip():
                         return confidence, brief_analysis
-                
                 if status in ['finished', 'blocked', 'expired']:
                     break
                 
-                time.sleep(10)
+                time.sleep(15)
             
             return None, None
             
@@ -290,7 +287,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             return None, None
 
 
-    def wait_for_detailed_scope(self, session_id: str, timeout: int = 600, poll_interval: int = 10) -> Optional[str]:
+    def wait_for_detailed_scope(self, session_id: str, timeout: int = 600, poll_interval: int = 15) -> Optional[str]:
         """
         Poll a scoping session until detailed analysis is available in structured output.
 
@@ -317,17 +314,13 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                 try:
                     session = self.get_session(session_id)
                     structured_output = session.get('structured_output', {})
-                    
+                    print(structured_output)
                     if structured_output and 'detailed_analysis' in structured_output:
+                        print("HOLLA")
                         detailed_analysis = structured_output['detailed_analysis']
                         if detailed_analysis and detailed_analysis.strip():
                             live.stop()
                             return detailed_analysis
-                    
-                    status = session.get('status_enum', session.get('status', 'unknown'))
-                    if status in ['finished', 'blocked', 'expired']:
-                        live.stop()
-                        return self._extract_detailed_from_messages(session)
 
                     time.sleep(poll_interval)
 
