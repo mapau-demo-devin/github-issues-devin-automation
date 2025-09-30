@@ -193,25 +193,27 @@ class DevinClient:
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        scoping_prompt = f"""Please provide a quick scoping assessment for this GitHub issue and update the structured output immediately with your findings.
+        scoping_prompt = f"""Analyze this GitHub issue and provide a confidence assessment. **UPDATE THE STRUCTURED OUTPUT IMMEDIATELY** when you determine your confidence level.
 
 Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
 Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
-Please update the structured output in this exact JSON format as soon as you determine your confidence:
+**STRUCTURED OUTPUT SCHEMA - Update this immediately:**
 {{
-  "confidence": "High|Medium|Low",
-  "analysis": "Brief 2-3 sentence analysis covering scope and complexity"
+  "confidence_level": "High|Medium|Low",
+  "brief_analysis": "2-3 sentence analysis of scope and complexity",
+  "implementation_estimate": "Brief time estimate (hours/days/weeks)"
 }}
 
-Please respond with:
-1. Confidence: [High/Medium/Low] - your confidence in implementing this
-2. Brief analysis (2-3 sentences) covering scope and complexity
+**INSTRUCTIONS:**
+1. Read the issue carefully
+2. **IMMEDIATELY update the structured output** with your confidence assessment
+3. Provide a brief response with "Confidence: [High/Medium/Low]" 
+4. Keep analysis concise (2-3 sentences maximum)
+5. Do NOT create pull requests or implement solutions
 
-**IMPORTANT: Update the structured output immediately when you determine your confidence level.**
-
-Keep your response concise and focused. Do NOT create pull requests or implement solutions."""
+**CRITICAL: Update the structured output as soon as you form an opinion about the confidence level. Do not wait until the end of your analysis.**"""
 
         try:
             session = self.create_session(scoping_prompt)
@@ -246,8 +248,8 @@ Keep your response concise and focused. Do NOT create pull requests or implement
                 status = session.get('status_enum', session.get('status', 'unknown'))
                 
                 structured_output = session.get('structured_output', {})
-                if structured_output and 'confidence' in structured_output:
-                    confidence = structured_output['confidence']
+                if structured_output and 'confidence_level' in structured_output:
+                    confidence = structured_output['confidence_level']
                     if confidence in ['High', 'Medium', 'Low']:
                         return confidence
                 
@@ -270,8 +272,8 @@ Keep your response concise and focused. Do NOT create pull requests or implement
     def _extract_full_analysis(self, session: Dict[Any, Any]) -> str:
         """Extract the full analysis from structured output or completed Devin session"""
         structured_output = session.get('structured_output', {})
-        if structured_output and 'analysis' in structured_output:
-            analysis = structured_output['analysis']
+        if structured_output and 'brief_analysis' in structured_output:
+            analysis = structured_output['brief_analysis']
             if analysis and analysis.strip():
                 return analysis
         
