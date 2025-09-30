@@ -223,7 +223,6 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             console.print(f"[green]Created scoping session: {session_id}[/green]")
             console.print(f"[dim]Session URL: {session['url']}[/dim]")
 
-            console.print(f"[blue]Waiting for Devin to assign a confidence score...[/blue]")
             confidence_level = self._extract_initial_confidence(session_id)
             if confidence_level:
                 console.print(f"[yellow]Initial Assessment: {confidence_level}[/yellow]")
@@ -240,24 +239,33 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
 
     def _extract_initial_confidence(self, session_id: str) -> Optional[str]:
         """Extract confidence level from structured output (immediate) with fallback to session title"""
+        from rich.console import Console
+        from rich.live import Live
+        from rich.spinner import Spinner
+        
+        console = Console()
+        
         try:
             import time
             max_attempts = 200  # 3 minutes with 15-second intervals (recommended by API docs)
             
-            for attempt in range(max_attempts):
-                session = self.get_session(session_id)
-                status = session.get('status_enum', session.get('status', 'unknown'))
-                
-                structured_output = session.get('structured_output', {})
-                if structured_output and 'confidence_level' in structured_output:
-                    confidence = structured_output['confidence_level']
-                    if confidence in ['High', 'Medium', 'Low']:
-                        return confidence
-                
-                if status in ['finished', 'blocked', 'expired']:
-                    break
-                
-                time.sleep(10)  # Use recommended 15-second intervals
+            with Live(Spinner("dots", text="Waiting for Devin to assign a confidence score"), console=console, refresh_per_second=4) as live:
+                for attempt in range(max_attempts):
+                    session = self.get_session(session_id)
+                    status = session.get('status_enum', session.get('status', 'unknown'))
+                    
+                    structured_output = session.get('structured_output', {})
+                    if structured_output and 'confidence_level' in structured_output:
+                        confidence = structured_output['confidence_level']
+                        if confidence in ['High', 'Medium', 'Low']:
+                            live.stop()
+                            return confidence
+                    
+                    if status in ['finished', 'blocked', 'expired']:
+                        live.stop()
+                        break
+                    
+                    time.sleep(10)  # Use recommended 15-second intervals
             
             return None
             

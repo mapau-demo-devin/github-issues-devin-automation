@@ -138,7 +138,7 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
             color = "red"
 
         analysis_panel = Panel(
-            f"[bold {color}]{confidence_level} Confidence[/bold {color}]\n\n"
+            f"Confidence: [bold {color}]{confidence_level}[/bold {color}]\n\n"
             f"[dim]AI Analysis:[/dim]\n{full_analysis}\n\n" +
             (f"[dim]Scoping session: {session_id}[/dim]" if session_id else ""),
             title="🎯 AI-Powered Issue Scoping",
