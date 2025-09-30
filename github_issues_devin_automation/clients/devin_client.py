@@ -253,42 +253,53 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             console.print(f"[red]Error during AI analysis: {e}[/red]")
             return None, None, None
 
-    def _extract_initial_confidence(self, session_id: str) -> Tuple[Optional[str], Optional[str]]:
+    def _extract_initial_confidence(self, session_id: str, timeout: int = 300, poll_interval: int = 10) -> Tuple[Optional[str], Optional[str]]:
         """Extract confidence level and brief analysis from structured output.
         
         Args:
             session_id: ID of the session to monitor
+            timeout: Maximum time to wait in seconds (default: 5 minutes)
+            poll_interval: Time between polls in seconds (default: 10 seconds)
             
         Returns:
             Tuple of (confidence_level, brief_analysis) or (None, None) if failed
         """
-        try:
-            import time
-            max_attempts = 200  # Allow up to ~30 minutes with 10-second intervals
-            
-            for attempt in range(max_attempts):
-                session = self.get_session(session_id)
-                status = session.get('status_enum', session.get('status', 'unknown'))
-                
-                structured_output = session.get('structured_output', {})
-                if structured_output and 'confidence_level' in structured_output and 'brief_analysis' in structured_output:
-                    confidence = structured_output['confidence_level']
-                    brief_analysis = structured_output['brief_analysis']
-                    if confidence in ['High', 'Medium', 'Low'] and brief_analysis and brief_analysis.strip():
-                        return confidence, brief_analysis
-                
-                if status in ['finished', 'blocked', 'expired']:
-                    break
-                
-                time.sleep(10)
-            
-            return None, None
-            
-        except Exception:
+        from rich.console import Console
+        from rich.live import Live
+        from rich.spinner import Spinner
+
+        console = Console()
+        start_time = time.time()
+
+        with Live(Spinner("dots", text="Waiting for Devin to assign a confidence score..."), console=console, refresh_per_second=4) as live:
+            while time.time() - start_time < timeout:
+                try:
+                    session = self.get_session(session_id)
+                    status = session.get('status_enum', session.get('status', 'unknown'))
+                    
+                    structured_output = session.get('structured_output', {})
+                    if structured_output and 'confidence_level' in structured_output and 'brief_analysis' in structured_output:
+                        confidence = structured_output['confidence_level']
+                        brief_analysis = structured_output['brief_analysis']
+                        if confidence in ['High', 'Medium', 'Low'] and brief_analysis and brief_analysis.strip():
+                            live.stop()
+                            return confidence, brief_analysis
+                    
+                    if status in ['finished', 'blocked', 'expired']:
+                        live.stop()
+                        break
+
+                    time.sleep(poll_interval)
+
+                except Exception as e:
+                    live.stop()
+                    raise e
+
+            live.stop()
             return None, None
 
 
-    def wait_for_detailed_scope(self, session_id: str, timeout: int = 600, poll_interval: int = 10) -> Optional[str]:
+    def wait_for_detailed_scope(self, session_id: str, timeout: int = 600, poll_interval: int = 10) -> Tuple[Optional[str], Optional[str]]:
         """
         Poll a scoping session until detailed scope analysis is available in structured output.
 
@@ -298,7 +309,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             poll_interval: Time between polls in seconds (default: 10 seconds)
 
         Returns:
-            Detailed scope analysis string or None if not available
+            Tuple of (detailed_scope_analysis, full_message) or (None, None) if not available
 
         Raises:
             TimeoutError: If detailed scope analysis doesn't become available within timeout
@@ -326,12 +337,14 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                             detailed_scope_analysis.strip() and 
                             detailed_scope_analysis != initial_brief):
                             live.stop()
-                            return detailed_scope_analysis
+                            full_message = self._extract_detailed_from_messages(session)
+                            return detailed_scope_analysis, full_message
                     
                     status = session.get('status_enum', session.get('status', 'unknown'))
                     if status in ['finished', 'blocked', 'expired']:
                         live.stop()
-                        return self._extract_detailed_from_messages(session)
+                        full_message = self._extract_detailed_from_messages(session)
+                        return full_message, full_message  # Return same content as both structured and message
 
                     time.sleep(poll_interval)
 

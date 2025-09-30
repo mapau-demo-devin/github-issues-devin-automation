@@ -176,7 +176,7 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
             console.print(f"\n[blue]Retrieving detailed scope analysis...[/blue]")
             
             try:
-                detailed_scope = devin_client.wait_for_detailed_scope(session_id)
+                detailed_scope, full_message = devin_client.wait_for_detailed_scope(session_id)
                 
                 if detailed_scope:
                     detailed_panel = Panel(
@@ -185,7 +185,66 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
                         border_style="blue"
                     )
                     console.print(detailed_panel)
+                    
+                    if full_message and full_message != detailed_scope:
+                        full_message_panel = Panel(
+                            full_message,
+                            title="💬 Full Devin Analysis Message",
+                            border_style="dim"
+                        )
+                        console.print(full_message_panel)
+                    
                     console.print(f"\n[dim]Full scoping session: {session_id}[/dim]")
+                    
+                    console.print(f"\n[yellow]Would you like to open a PR session to implement this issue?[/yellow]")
+                    
+                    try:
+                        pr_questions = [
+                            inquirer.List('pr_action',
+                                         message="Select an action",
+                                         choices=[
+                                             ('🚀 Open PR session (create implementation)', 'create_pr'),
+                                             ('❌ No, finish here', 'finish')
+                                         ],
+                                         carousel=True)
+                        ]
+                        
+                        pr_answers = inquirer.prompt(pr_questions)
+                        if pr_answers and pr_answers['pr_action'] == 'create_pr':
+                            console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
+
+                            implementation_prompt = f"""Please implement a solution for this GitHub issue:
+
+Issue: {issue['title']}
+Description: {issue['body']}
+Repository: {repo}
+
+AI Scoping Analysis:
+- Confidence Level: {confidence_level}
+- Analysis: {brief_analysis[:200]}...
+
+Steps:
+1. Clone the repository
+2. Analyze the codebase
+3. Implement the requested feature/fix
+4. Create tests if appropriate
+5. Create a pull request
+
+Note: This is an implementation session. Please create a working solution and PR."""
+
+                            _process_issue_with_devin(
+                                repo,
+                                issue_number,
+                                implementation_prompt,
+                                confidence_level=confidence_level,
+                                ai_analysis=brief_analysis
+                            )
+                        else:
+                            console.print("[dim]Analysis complete.[/dim]")
+                            
+                    except KeyboardInterrupt:
+                        console.print("\n[dim]Operation cancelled.[/dim]")
+                        
                 else:
                     console.print(f"[yellow]Detailed scope not yet available. Check the session later.[/yellow]")
                     console.print(f"[dim]Session ID: {session_id}[/dim]")
