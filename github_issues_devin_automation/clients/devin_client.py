@@ -199,22 +199,28 @@ Issue Title: {issue.get('title', '')}
 Issue Body: {issue.get('body', '') or 'No description provided'}
 Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
-**STRUCTURED OUTPUT SCHEMA - Update this immediately:**
+**STRUCTURED OUTPUT SCHEMA - Update this in two phases:**
 {{
   "confidence_level": "High|Medium|Low",
   "brief_analysis": "2-3 sentence analysis of scope and complexity",
-  "implementation_estimate": "Brief time estimate (hours/days/weeks)"
+  "implementation_estimate": "Brief time estimate (hours/days/weeks)",
+  "detailed_scope": "Comprehensive scope analysis (only update after completing detailed analysis)"
 }}
 
 **INSTRUCTIONS:**
 1. Read the issue carefully
-2. **IMMEDIATELY update the structured output** with your confidence assessment
+2. **IMMEDIATELY update the structured output** with your confidence assessment and brief_analysis
 3. Provide a brief response with "Confidence: [High/Medium/Low]" 
-4. Keep analysis concise (2-3 sentences maximum). 
-5. Once you are done with the above, provide a longer scope assessment. 
-6. Do NOT create pull requests or implement solutions
+4. Keep initial analysis concise (2-3 sentences maximum)
+5. Once you complete the above, provide a comprehensive detailed scope assessment including:
+   - Detailed implementation approach
+   - Potential challenges and edge cases
+   - Testing considerations
+   - Time breakdown by component
+6. **UPDATE the structured output's detailed_scope field** when you complete the detailed analysis
+7. Do NOT create pull requests or implement solutions
 
-**CRITICAL: Update the structured output as soon as you form an opinion about the confidence level. Do not wait until the end of your analysis.**"""
+**CRITICAL: Update the structured output immediately for initial assessment, then again after completing the detailed scope analysis.**"""
 
         try:
             session = self.create_session(scoping_prompt)
@@ -280,3 +286,62 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                     return content
 
         return "Unable to extract analysis from Devin's response"
+
+    def wait_for_detailed_scope(self, session_id: str, timeout: int = 300, poll_interval: int = 10) -> Optional[str]:
+        """
+        Poll a scoping session until detailed scope is available in structured output.
+
+        Args:
+            session_id: ID of the session to monitor
+            timeout: Maximum time to wait in seconds (default: 5 minutes)
+            poll_interval: Time between polls in seconds (default: 10 seconds)
+
+        Returns:
+            Detailed scope string or None if not available
+
+        Raises:
+            TimeoutError: If detailed scope doesn't become available within timeout
+        """
+        from rich.console import Console
+        from rich.live import Live
+        from rich.spinner import Spinner
+
+        console = Console()
+        start_time = time.time()
+
+        with Live(Spinner("dots", text="Waiting for detailed scope analysis from Devin..."), console=console, refresh_per_second=4) as live:
+            while time.time() - start_time < timeout:
+                try:
+                    session = self.get_session(session_id)
+                    structured_output = session.get('structured_output', {})
+                    
+                    if structured_output and 'detailed_scope' in structured_output:
+                        detailed_scope = structured_output['detailed_scope']
+                        if detailed_scope and detailed_scope.strip():
+                            live.stop()
+                            return detailed_scope
+                    
+                    status = session.get('status_enum', session.get('status', 'unknown'))
+                    if status in ['finished', 'blocked', 'expired']:
+                        live.stop()
+                        return self._extract_detailed_from_messages(session)
+
+                    time.sleep(poll_interval)
+
+                except Exception as e:
+                    live.stop()
+                    raise e
+
+            live.stop()
+            raise TimeoutError(f"Detailed scope did not become available within {timeout} seconds")
+    
+    def _extract_detailed_from_messages(self, session: Dict[Any, Any]) -> str:
+        """Extract detailed scope from session messages if not in structured output."""
+        messages = session.get('messages', [])
+        for message in reversed(messages):
+            if message.get('type') == 'devin_message':
+                content = message.get('message', '')
+                if content.strip() and len(content.strip()) > 200:
+                    return content
+        
+        return "Detailed scope analysis not yet available. The scoping session may still be in progress."

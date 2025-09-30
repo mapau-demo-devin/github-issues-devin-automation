@@ -3,6 +3,7 @@ CLI command definitions for GitHub Issues Devin Automation.
 """
 
 import click
+import inquirer
 import requests
 from typing import Dict, Any
 from rich.console import Console
@@ -146,10 +147,56 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
         )
         console.print(analysis_panel)
 
-        console.print(f"\n[yellow]Would you like to create a separate Devin session to implement this issue?[/yellow]")
-        user_input = click.prompt("Create implementation session? (y/N)", default="n", show_default=True)
+        console.print(f"\n[yellow]What would you like to do next?[/yellow]")
+        
+        try:
+            questions = [
+                inquirer.List('action',
+                             message="Select an action",
+                             choices=[
+                                 ('📋 See detailed scope analysis', 'detailed_scope'),
+                                 ('🚀 Open PR session (create implementation)', 'pr_session'),
+                                 ('❌ Cancel', 'cancel')
+                             ],
+                             carousel=True)
+            ]
+            
+            answers = inquirer.prompt(questions)
+            if answers is None or answers['action'] == 'cancel':
+                console.print("[dim]Operation cancelled.[/dim]")
+                return
+            
+            action = answers['action']
+            
+        except KeyboardInterrupt:
+            console.print("\n[dim]Operation cancelled.[/dim]")
+            return
 
-        if user_input.lower() in ['y', 'yes']:
+        if action == 'detailed_scope':
+            console.print(f"\n[blue]Retrieving detailed scope analysis...[/blue]")
+            
+            try:
+                detailed_scope = devin_client.wait_for_detailed_scope(session_id)
+                
+                if detailed_scope:
+                    detailed_panel = Panel(
+                        detailed_scope,
+                        title="📊 Detailed Scope Analysis",
+                        border_style="blue"
+                    )
+                    console.print(detailed_panel)
+                    console.print(f"\n[dim]Full scoping session: {session_id}[/dim]")
+                else:
+                    console.print(f"[yellow]Detailed scope not yet available. Check the session later.[/yellow]")
+                    console.print(f"[dim]Session ID: {session_id}[/dim]")
+            
+            except TimeoutError as e:
+                console.print(f"[yellow]{e}[/yellow]")
+                console.print(f"[dim]You can check the session later. Session ID: {session_id}[/dim]")
+            except Exception as e:
+                console.print(f"[red]Error retrieving detailed scope: {e}[/red]")
+        
+        elif action == 'pr_session':
             console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
 
             implementation_prompt = f"""Please implement a solution for this GitHub issue:
@@ -178,8 +225,6 @@ Note: This is an implementation session. Please create a working solution and PR
                 confidence_level=confidence_level,
                 ai_analysis=full_analysis
             )
-        else:
-            console.print("[dim]Skipping implementation session creation.[/dim]")
 
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
