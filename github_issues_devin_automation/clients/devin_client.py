@@ -193,17 +193,15 @@ class DevinClient:
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. **UPDATE THE STRUCTURED OUTPUT IMMEDIATELY** as soon as you determine your confidence level and scope.
-
-Issue Title: {issue.get('title', '')}
-Issue Body: {issue.get('body', '') or 'No description provided'}
-Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
-
-**STRUCTURED OUTPUT SCHEMA - Update this IMMEDIATELY:**
+        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. Please update the structured output immediately when you assign a confidence score and brief_analysis. Use the following format for the structured_output:.
 {{
   "confidence_level": "High|Medium|Low",
   "brief_analysis": "2-3 sentence analysis of scope and complexity"
 }}
+
+Issue Title: {issue.get('title', '')}
+Issue Body: {issue.get('body', '') or 'No description provided'}
+Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
 
 **INSTRUCTIONS:**
 1. Read the issue carefully
@@ -227,12 +225,12 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             if not confidence_level or not brief_analysis:
                 console.print(f"[red]Failed to extract initial assessment[/red]")
                 return None, None, None
-            
-            detailed_analysis_prompt = """Now that you've provided the initial assessment, please provide a comprehensive detailed scope analysis.
 
-**STRUCTURED OUTPUT SCHEMA - Update when detailed analysis is ready:**
+            detailed_analysis_prompt = f"""Now that you've provided the initial assessment, please provide a comprehensive detailed scope analysis using the following structured_output schema:
 {{
-  "detailed_scope_analysis": "Comprehensive detailed scope analysis"
+  "detailed_analysis": "Comprehensive detailed scope analysis"
+   "implementation_approach": "Detailed implementation approach"
+  "testing_considerations": "Testing considerations"
 }}
 
 **INSTRUCTIONS FOR DETAILED ANALYSIS:**
