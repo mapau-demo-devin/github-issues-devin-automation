@@ -86,13 +86,14 @@ def _process_issue_with_devin(repo: str, issue_number: int, prompt_template: str
     except Exception as e:
         console.print(f"[red]Error processing issue: {e}[/red]")
 
-def select_issue_interactively(github_client: GitHubClient, repo: str, state: str = 'open', labels: Optional[str] = None, milestone: Optional[str] = None, assignee: Optional[str] = None) -> int:
+def select_issue_interactively(github_client: GitHubClient, repo: str, limit: int = 10, state: str = 'open', labels: Optional[str] = None, milestone: Optional[str] = None, assignee: Optional[str] = None) -> int:
     """
     Interactively select an issue from a repository using arrow keys.
     
     Args:
         github_client: GitHub client instance
         repo: Repository in format 'owner/repo'
+        limit: Maximum number of issues to display
         state: Issue state to filter by
         labels: Comma-separated list of label names to filter by
         milestone: Milestone number, title, "*" for any, "none" for none
@@ -102,11 +103,7 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
         Selected issue number
     """
     try:
-        has_many_issues = github_client.has_many_issues(repo, threshold=10, state=state, labels=labels, milestone=milestone, assignee=assignee)
-        if has_many_issues:
-            limit = 10
-        else:
-            limit = 50
+        has_many_issues = github_client.has_many_issues(repo, threshold=limit, state=state, labels=labels, milestone=milestone, assignee=assignee)
         
         issues = github_client.list_issues(repo, state=state, limit=limit, labels=labels, milestone=milestone, assignee=assignee)
     except ValueError as e:
@@ -156,7 +153,7 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, state: st
             raise click.ClickException("Operation cancelled")
         
         if has_many_issues:
-            console.print(f"\n[yellow]Displaying 10 issues by default. Use --limit argument if you want to see more.[/yellow]")
+            console.print(f"\n[yellow]Displaying {limit} issues by default. Use --limit argument if you want to see more.[/yellow]")
         
         return answers['issue']
         
