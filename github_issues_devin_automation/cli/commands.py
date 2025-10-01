@@ -213,15 +213,15 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
                         if pr_answers and pr_answers['pr_action'] == 'create_pr':
                             console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
 
-                            implementation_prompt = f"""Please implement a solution for this GitHub issue:
+                            implementation_prompt = """Please implement a solution for this GitHub issue:
 
-Issue: {issue['title']}
-Description: {issue['body']}
+Issue: {title}
+Description: {body}
 Repository: {repo}
 
 AI Scoping Analysis:
 - Confidence Level: {confidence_level}
-- Analysis: {brief_analysis[:200]}...
+- Analysis: {ai_analysis}
 
 Steps:
 1. Clone the repository
@@ -258,15 +258,15 @@ Note: This is an implementation session. Please create a working solution and PR
         elif action == 'pr_session':
             console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
 
-            implementation_prompt = f"""Please implement a solution for this GitHub issue:
+            implementation_prompt = """Please implement a solution for this GitHub issue:
 
-Issue: {issue['title']}
-Description: {issue['body']}
+Issue: {title}
+Description: {body}
 Repository: {repo}
 
 AI Scoping Analysis:
 - Confidence Level: {confidence_level}
-- Analysis: {brief_analysis[:200]}...
+- Analysis: {ai_analysis}
 
 Steps:
 1. Clone the repository
