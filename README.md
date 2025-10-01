@@ -21,7 +21,7 @@ A CLI tool that integrates GitHub Issues with Devin AI to automate issue scoping
 ```bash
 pip install -r requirements.txt
 ```
-   **Note**: This includes the `inquirer` library for interactive arrow key navigation.
+   **Note**: This includes the `questionary` library for interactive arrow key navigation.
 
 2. Set up environment variables:
 ```bash

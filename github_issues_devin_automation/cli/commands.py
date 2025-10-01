@@ -3,7 +3,7 @@ CLI command definitions for GitHub Issues Devin Automation.
 """
 
 import click
-import inquirer
+import questionary
 import requests
 from typing import Dict, Any
 from rich.console import Console
@@ -151,23 +151,20 @@ def scope_issue(repo, issue_number, limit, label, milestone, assignee):
         console.print(f"\n[yellow]What would you like to do next?[/yellow]")
         
         try:
-            questions = [
-                inquirer.List('action',
-                             message="Select an action",
-                             choices=[
-                                 ('📋 See detailed scope analysis', 'detailed_scope'),
-                                 ('🚀 Open PR session (create implementation)', 'pr_session'),
-                                 ('❌ Cancel', 'cancel')
-                             ],
-                             carousel=True)
+            action_choices = [
+                questionary.Choice('📋 See detailed scope analysis', 'detailed_scope'),
+                questionary.Choice('🚀 Open PR session (create implementation)', 'pr_session'),
+                questionary.Choice('❌ Cancel', 'cancel')
             ]
             
-            answers = inquirer.prompt(questions)
-            if answers is None or answers['action'] == 'cancel':
+            action = questionary.select(
+                "Select an action",
+                choices=action_choices
+            ).ask()
+            
+            if action is None or action == 'cancel':
                 console.print("[dim]Operation cancelled.[/dim]")
                 return
-            
-            action = answers['action']
             
         except KeyboardInterrupt:
             console.print("\n[dim]Operation cancelled.[/dim]")
@@ -200,18 +197,17 @@ def scope_issue(repo, issue_number, limit, label, milestone, assignee):
                     console.print(f"\n[yellow]Would you like to open a PR session to implement this issue?[/yellow]")
                     
                     try:
-                        pr_questions = [
-                            inquirer.List('pr_action',
-                                         message="Select an action",
-                                         choices=[
-                                             ('🚀 Open PR session (create implementation)', 'create_pr'),
-                                             ('❌ No, finish here', 'finish')
-                                         ],
-                                         carousel=True)
+                        pr_choices = [
+                            questionary.Choice('🚀 Open PR session (create implementation)', 'create_pr'),
+                            questionary.Choice('❌ No, finish here', 'finish')
                         ]
                         
-                        pr_answers = inquirer.prompt(pr_questions)
-                        if pr_answers and pr_answers['pr_action'] == 'create_pr':
+                        pr_action = questionary.select(
+                            "Select an action",
+                            choices=pr_choices
+                        ).ask()
+                        
+                        if pr_action and pr_action == 'create_pr':
                             console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
 
                             implementation_prompt = """Please implement a solution for this GitHub issue:

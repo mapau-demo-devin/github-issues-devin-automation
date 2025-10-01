@@ -5,7 +5,7 @@ Shared CLI utilities for GitHub Issues Devin Automation.
 import re
 import requests
 import click
-import inquirer
+import questionary
 from functools import wraps
 from typing import Optional, Dict, Any
 from rich.console import Console
@@ -141,21 +141,21 @@ def select_issue_interactively(github_client: GitHubClient, repo: str, limit: in
         console.print(f"\n[blue]Select an issue from {repo}[/blue]")
         console.print("[dim]Use arrow keys to navigate, Enter to select[/dim]\n")
         
-        questions = [
-            inquirer.List('issue',
-                         message="Select an issue",
-                         choices=issue_choices,
-                         carousel=True)
-        ]
+        choices = [questionary.Choice(title=choice_text, value=issue_num) 
+                   for choice_text, issue_num in issue_choices]
         
-        answers = inquirer.prompt(questions)
-        if answers is None:
+        answer = questionary.select(
+            "Select an issue",
+            choices=choices
+        ).ask()
+        
+        if answer is None:
             raise click.ClickException("Operation cancelled")
         
         if has_many_issues:
             console.print(f"\n[yellow]Displaying {limit} issues by default. Use --limit argument if you want to see more.[/yellow]")
         
-        return answers['issue']
+        return answer
         
     except KeyboardInterrupt:
         raise click.ClickException("Operation cancelled")
