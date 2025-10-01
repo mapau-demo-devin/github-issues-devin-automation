@@ -38,7 +38,7 @@ class GitHubClient:
         url = f"{self.base_url}/repos/{repo}/issues"
         params = {
             'state': state,
-            'per_page': limit,
+            'per_page': limit * 2,
             'sort': 'updated',
             'direction': 'desc'
         }
@@ -80,6 +80,8 @@ class GitHubClient:
         
         if exclude_pull_requests:
             issues_data = [issue for issue in issues_data if 'pull_request' not in issue]
+        
+        issues_data = issues_data[:limit]
         
         if return_headers:
             return issues_data, dict(response.headers)

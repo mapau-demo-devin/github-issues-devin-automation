@@ -87,10 +87,11 @@ def list_issues(repo, state, limit, label, milestone, assignee):
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
 @click.option('--issue-number', type=int, help='Issue number to scope (optional - will prompt if not provided)')
+@click.option('--limit', default=10, help='Maximum number of issues to display for selection')
 @click.option('--label', help='Filter by label names (comma-separated for multiple)')
 @click.option('--milestone', help='Filter by milestone (number, "*" for any, "none" for none)')
 @click.option('--assignee', help='Filter by assignee (username, "*" for any, "none" for unassigned)')
-def scope_issue(repo, issue_number, label, milestone, assignee):
+def scope_issue(repo, issue_number, limit, label, milestone, assignee):
     """Analyze issue complexity and provide confidence score"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
@@ -107,7 +108,7 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
 
     if issue_number is None:
         try:
-            issue_number = select_issue_interactively(github_client, repo, labels=label, milestone=milestone, assignee=assignee)
+            issue_number = select_issue_interactively(github_client, repo, limit=limit, labels=label, milestone=milestone, assignee=assignee)
         except click.ClickException as e:
             console.print(f"[red]Error: {e}[/red]")
             return
@@ -297,10 +298,11 @@ Note: This is an implementation session. Please create a working solution and PR
 @cli.command()
 @click.option('--repo', required=True, help='Repository in format owner/repo')
 @click.option('--issue-number', type=int, help='Issue number to complete (optional - will prompt if not provided)')
+@click.option('--limit', default=10, help='Maximum number of issues to display for selection')
 @click.option('--label', help='Filter by label names (comma-separated for multiple)')
 @click.option('--milestone', help='Filter by milestone (number, "*" for any, "none" for none)')
 @click.option('--assignee', help='Filter by assignee (username, "*" for any, "none" for unassigned)')
-def complete_issue(repo, issue_number, label, milestone, assignee):
+def complete_issue(repo, issue_number, limit, label, milestone, assignee):
     """Complete an issue using Devin AI"""
     if not validate_repo_format(repo):
         console.print(f"[red]Error: Invalid repository format '{repo}'[/red]")
@@ -317,7 +319,7 @@ def complete_issue(repo, issue_number, label, milestone, assignee):
 
     if issue_number is None:
         try:
-            issue_number = select_issue_interactively(github_client, repo, labels=label, milestone=milestone, assignee=assignee)
+            issue_number = select_issue_interactively(github_client, repo, limit=limit, labels=label, milestone=milestone, assignee=assignee)
         except click.ClickException as e:
             console.print(f"[red]Error: {e}[/red]")
             return
