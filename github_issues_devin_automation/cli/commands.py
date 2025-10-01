@@ -3,6 +3,7 @@ CLI command definitions for GitHub Issues Devin Automation.
 """
 
 import click
+import inquirer
 import requests
 from typing import Dict, Any
 from rich.console import Console
@@ -123,7 +124,7 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
         from ..clients.devin_client import DevinClient
         devin_client = DevinClient()
         
-        confidence_level, full_analysis, session_id = devin_client.calculate_confidence_score_with_ai(issue)
+        confidence_level, brief_analysis, session_id = devin_client.calculate_confidence_score_with_ai(issue)
         
         if confidence_level is None:
             console.print(f"[red]Failed to analyze issue with AI. Unable to extract confidence assessment from Devin session.[/red]")
@@ -139,17 +140,122 @@ def scope_issue(repo, issue_number, label, milestone, assignee):
 
         analysis_panel = Panel(
             f"[bold {color}]{confidence_level} Confidence[/bold {color}]\n\n"
-            f"[dim]AI Analysis:[/dim]\n{full_analysis}\n\n" +
+            f"[dim]AI Analysis:[/dim]\n{brief_analysis}\n\n" +
             (f"[dim]Scoping session: {session_id}[/dim]" if session_id else ""),
             title="🎯 AI-Powered Issue Scoping",
             border_style=color
         )
         console.print(analysis_panel)
 
-        console.print(f"\n[yellow]Would you like to create a separate Devin session to implement this issue?[/yellow]")
-        user_input = click.prompt("Create implementation session? (y/N)", default="n", show_default=True)
+        console.print(f"\n[yellow]What would you like to do next?[/yellow]")
+        
+        try:
+            questions = [
+                inquirer.List('action',
+                             message="Select an action",
+                             choices=[
+                                 ('📋 See detailed scope analysis', 'detailed_scope'),
+                                 ('🚀 Open PR session (create implementation)', 'pr_session'),
+                                 ('❌ Cancel', 'cancel')
+                             ],
+                             carousel=True)
+            ]
+            
+            answers = inquirer.prompt(questions)
+            if answers is None or answers['action'] == 'cancel':
+                console.print("[dim]Operation cancelled.[/dim]")
+                return
+            
+            action = answers['action']
+            
+        except KeyboardInterrupt:
+            console.print("\n[dim]Operation cancelled.[/dim]")
+            return
 
-        if user_input.lower() in ['y', 'yes']:
+        if action == 'detailed_scope':
+            console.print(f"\n[blue]Retrieving detailed scope analysis...[/blue]")
+            
+            try:
+                detailed_scope, full_message = devin_client.wait_for_detailed_scope(session_id)
+                
+                if detailed_scope:
+                    detailed_panel = Panel(
+                        detailed_scope,
+                        title="📊 Detailed Scope Analysis",
+                        border_style="blue"
+                    )
+                    console.print(detailed_panel)
+                    
+                    if full_message and full_message != detailed_scope:
+                        full_message_panel = Panel(
+                            full_message,
+                            title="💬 Full Devin Analysis Message",
+                            border_style="dim"
+                        )
+                        console.print(full_message_panel)
+                    
+                    console.print(f"\n[dim]Full scoping session: {session_id}[/dim]")
+                    
+                    console.print(f"\n[yellow]Would you like to open a PR session to implement this issue?[/yellow]")
+                    
+                    try:
+                        pr_questions = [
+                            inquirer.List('pr_action',
+                                         message="Select an action",
+                                         choices=[
+                                             ('🚀 Open PR session (create implementation)', 'create_pr'),
+                                             ('❌ No, finish here', 'finish')
+                                         ],
+                                         carousel=True)
+                        ]
+                        
+                        pr_answers = inquirer.prompt(pr_questions)
+                        if pr_answers and pr_answers['pr_action'] == 'create_pr':
+                            console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
+
+                            implementation_prompt = f"""Please implement a solution for this GitHub issue:
+
+Issue: {issue['title']}
+Description: {issue['body']}
+Repository: {repo}
+
+AI Scoping Analysis:
+- Confidence Level: {confidence_level}
+- Analysis: {brief_analysis[:200]}...
+
+Steps:
+1. Clone the repository
+2. Analyze the codebase
+3. Implement the requested feature/fix
+4. Create tests if appropriate
+5. Create a pull request
+
+Note: This is an implementation session. Please create a working solution and PR."""
+
+                            _process_issue_with_devin(
+                                repo,
+                                issue_number,
+                                implementation_prompt,
+                                confidence_level=confidence_level,
+                                ai_analysis=brief_analysis
+                            )
+                        else:
+                            console.print("[dim]Analysis complete.[/dim]")
+                            
+                    except KeyboardInterrupt:
+                        console.print("\n[dim]Operation cancelled.[/dim]")
+                        
+                else:
+                    console.print(f"[yellow]Detailed scope not yet available. Check the session later.[/yellow]")
+                    console.print(f"[dim]Session ID: {session_id}[/dim]")
+            
+            except TimeoutError as e:
+                console.print(f"[yellow]{e}[/yellow]")
+                console.print(f"[dim]You can check the session later. Session ID: {session_id}[/dim]")
+            except Exception as e:
+                console.print(f"[red]Error retrieving detailed scope: {e}[/red]")
+        
+        elif action == 'pr_session':
             console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
 
             implementation_prompt = f"""Please implement a solution for this GitHub issue:
@@ -160,7 +266,7 @@ Repository: {repo}
 
 AI Scoping Analysis:
 - Confidence Level: {confidence_level}
-- Analysis: {full_analysis[:200]}...
+- Analysis: {brief_analysis[:200]}...
 
 Steps:
 1. Clone the repository
@@ -176,10 +282,8 @@ Note: This is an implementation session. Please create a working solution and PR
                 issue_number,
                 implementation_prompt,
                 confidence_level=confidence_level,
-                ai_analysis=full_analysis
+                ai_analysis=brief_analysis
             )
-        else:
-            console.print("[dim]Skipping implementation session creation.[/dim]")
 
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
