@@ -411,7 +411,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
         for message in reversed(messages):
             if message.get('type') == 'devin_message':
                 content = message.get('message', '')
-                if content.strip() and len(content.strip()) > 200:
+                if content.strip() and len(content.strip()) > 200 and "detailed_analysis" in content:
                     return self._clean_json_from_message(content)
         
         return "Detailed scope analysis not yet available. The scoping session may still be in progress."
