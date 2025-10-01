@@ -283,11 +283,13 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                         brief_analysis = structured_output['brief_analysis']
                         if confidence in ['High', 'Medium', 'Low'] and brief_analysis and brief_analysis.strip():
                             live.stop()
+                            brief_analysis = self._clean_json_from_message(brief_analysis)
                             return confidence, brief_analysis
                     
                     if status in ['finished', 'blocked', 'expired']:
                         live.stop()
-                        break
+                        # Use message fallback if structured output not available
+                        return self._extract_initial_from_messages(session)
 
                     time.sleep(poll_interval)
 
@@ -296,7 +298,11 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                     raise e
 
             live.stop()
-            return None, None
+            try:
+                session = self.get_session(session_id)
+                return self._extract_initial_from_messages(session)
+            except:
+                return None, None
 
 
     def wait_for_detailed_scope(self, session_id: str, timeout: int = 600, poll_interval: int = 10) -> Tuple[Optional[str], Optional[str]]:
@@ -337,6 +343,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                             detailed_scope_analysis.strip() and 
                             detailed_scope_analysis != initial_brief):
                             live.stop()
+                            detailed_scope_analysis = self._clean_json_from_message(detailed_scope_analysis)
                             full_message = self._extract_detailed_from_messages(session)
                             return detailed_scope_analysis, full_message
                     
@@ -355,6 +362,50 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             live.stop()
             raise TimeoutError(f"Detailed scope analysis did not become available within {timeout} seconds")
     
+    def _clean_json_from_message(self, content: str) -> str:
+        """Remove JSON formatting from message content to make it cohesive.
+        
+        Args:
+            content: Raw message content that may contain JSON structures
+            
+        Returns:
+            Cleaned message content without JSON formatting
+        """
+        import json
+        
+        if not content or not content.strip():
+            return content
+        
+        try:
+            parsed = json.loads(content.strip())
+            if isinstance(parsed, dict):
+                parts = []
+                for key in ['confidence_level', 'brief_analysis', 'detailed_analysis', 
+                           'detailed_scope_analysis', 'implementation_approach', 'testing_considerations']:
+                    if key in parsed and parsed[key]:
+                        parts.append(str(parsed[key]))
+                if parts:
+                    return '\n\n'.join(parts)
+        except (json.JSONDecodeError, ValueError):
+            pass
+        
+        cleaned = content
+        
+        cleaned = re.sub(r'\*\*STRUCTURED OUTPUT SCHEMA[^{]*', '', cleaned, flags=re.IGNORECASE)
+        
+        json_pattern = r'["\'](?:confidence_level|brief_analysis|detailed_analysis|detailed_scope_analysis|implementation_approach|testing_considerations)["\']\s*:\s*["\']([^"\']+)["\']'
+        matches = re.findall(json_pattern, cleaned, re.DOTALL)
+        if matches:
+            return '\n\n'.join(match.strip() for match in matches if match.strip())
+        
+        cleaned = re.sub(r'^\s*\{[\s\n]*', '', cleaned)  # Leading {
+        cleaned = re.sub(r'[\s\n]*\}\s*$', '', cleaned)  # Trailing }
+        cleaned = re.sub(r'["\'](?:confidence_level|brief_analysis|detailed_analysis|detailed_scope_analysis|implementation_approach|testing_considerations)["\']\s*:\s*', '', cleaned)
+        cleaned = re.sub(r',\s*["\']', '\n', cleaned)  # Commas between fields
+        cleaned = re.sub(r'^["\']|["\']$', '', cleaned.strip())  # Leading/trailing quotes
+        
+        return cleaned.strip()
+    
     def _extract_detailed_from_messages(self, session: Dict[Any, Any]) -> str:
         """Extract detailed scope from session messages if not in structured output."""
         messages = session.get('messages', [])
@@ -362,6 +413,29 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             if message.get('type') == 'devin_message':
                 content = message.get('message', '')
                 if content.strip() and len(content.strip()) > 200:
-                    return content
+                    return self._clean_json_from_message(content)
         
         return "Detailed scope analysis not yet available. The scoping session may still be in progress."
+    
+    def _extract_initial_from_messages(self, session: Dict[Any, Any]) -> Tuple[Optional[str], Optional[str]]:
+        """Extract initial confidence and brief analysis from session messages as fallback.
+        
+        Returns:
+            Tuple of (confidence_level, brief_analysis) or (None, None) if not found
+        """
+        messages = session.get('messages', [])
+        for message in reversed(messages):
+            if message.get('type') == 'devin_message':
+                content = message.get('message', '')
+                if content.strip():
+                    cleaned = self._clean_json_from_message(content)
+                    
+                    confidence_match = re.search(r'\b(High|Medium|Low)\s+Confidence\b', cleaned, re.IGNORECASE)
+                    if not confidence_match:
+                        confidence_match = re.search(r'\bConfidence:\s*(High|Medium|Low)\b', cleaned, re.IGNORECASE)
+                    
+                    if confidence_match:
+                        confidence = confidence_match.group(1).capitalize()
+                        return confidence, cleaned
+        
+        return None, None
