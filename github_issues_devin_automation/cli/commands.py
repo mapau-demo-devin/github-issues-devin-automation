@@ -12,6 +12,11 @@ from rich.panel import Panel
 from rich.text import Text
 
 from ..clients.github_client import GitHubClient
+from ..clients.devin_client import DevinClient
+from ..prompts.templates import (
+    COMPLETE_ISSUE_PROMPT,
+    IMPLEMENTATION_PROMPT,
+)
 from .utils import (
     validate_repo_format,
     validate_issue_number,
@@ -122,7 +127,6 @@ def scope_issue(repo, issue_number, limit, label, milestone, assignee):
         issue = github_client.get_issue(repo, issue_number)
         console.print(f"\n[blue]Analyzing issue #{issue_number}: {issue['title']}[/blue]")
 
-        from ..clients.devin_client import DevinClient
         devin_client = DevinClient()
         
         confidence_level, brief_analysis, session_id = devin_client.calculate_confidence_score_with_ai(issue)
@@ -214,29 +218,10 @@ def scope_issue(repo, issue_number, limit, label, milestone, assignee):
                         if pr_answers and pr_answers['pr_action'] == 'create_pr':
                             console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
 
-                            implementation_prompt = """Please implement a solution for this GitHub issue:
-
-Issue: {title}
-Description: {body}
-Repository: {repo}
-
-AI Scoping Analysis:
-- Confidence Level: {confidence_level}
-- Analysis: {ai_analysis}
-
-Steps:
-1. Clone the repository
-2. Analyze the codebase
-3. Implement the requested feature/fix
-4. Create tests if appropriate
-5. Create a pull request
-
-Note: This is an implementation session. Please create a working solution and PR."""
-
                             _process_issue_with_devin(
                                 repo,
                                 issue_number,
-                                implementation_prompt,
+                                IMPLEMENTATION_PROMPT,
                                 confidence_level=confidence_level,
                                 ai_analysis=brief_analysis
                             )
@@ -259,29 +244,10 @@ Note: This is an implementation session. Please create a working solution and PR
         elif action == 'pr_session':
             console.print(f"\n[blue]Creating implementation session for issue #{issue_number}...[/blue]")
 
-            implementation_prompt = """Please implement a solution for this GitHub issue:
-
-Issue: {title}
-Description: {body}
-Repository: {repo}
-
-AI Scoping Analysis:
-- Confidence Level: {confidence_level}
-- Analysis: {ai_analysis}
-
-Steps:
-1. Clone the repository
-2. Analyze the codebase
-3. Implement the requested feature/fix
-4. Create tests if appropriate
-5. Create a pull request
-
-Note: This is an implementation session. Please create a working solution and PR."""
-
             _process_issue_with_devin(
                 repo,
                 issue_number,
-                implementation_prompt,
+                IMPLEMENTATION_PROMPT,
                 confidence_level=confidence_level,
                 ai_analysis=brief_analysis
             )
@@ -329,19 +295,4 @@ def complete_issue(repo, issue_number, limit, label, milestone, assignee):
             console.print(f"[yellow]Issue numbers must be positive integers[/yellow]")
             return
 
-    prompt_template = """
-    Please implement a solution for this GitHub issue:
-
-    Issue: {title}
-    Description: {body}
-    Repository: {repo}
-
-    Steps:
-    1. Clone the repository
-    2. Analyze the codebase
-    3. Implement the requested feature/fix
-    4. Create tests if appropriate
-    5. Create a pull request
-    """
-
-    _process_issue_with_devin(repo, issue_number, prompt_template)
+    _process_issue_with_devin(repo, issue_number, COMPLETE_ISSUE_PROMPT)

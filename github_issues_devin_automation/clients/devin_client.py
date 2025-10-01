@@ -2,11 +2,17 @@
 Devin API client for creating and managing Devin sessions.
 """
 
+import json
+import re
 import requests
 import time
-import re
 from typing import Dict, Any, Tuple, Optional
+from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
+
 from ..config.settings import get_devin_api_key, get_devin_api_base_url, get_devin_api_timeout, get_devin_api_max_retries
+from ..prompts.templates import SCOPING_INITIAL_PROMPT, SCOPING_DETAILED_PROMPT
 
 class DevinClient:
     def __init__(self):
@@ -150,10 +156,6 @@ class DevinClient:
             TimeoutError: If session doesn't complete within timeout
             requests.exceptions.RequestException: If API calls fail
         """
-        from rich.console import Console
-        from rich.live import Live
-        from rich.spinner import Spinner
-
         console = Console()
         start_time = time.time()
 
@@ -188,29 +190,14 @@ class DevinClient:
         Returns:
             Tuple of (confidence_level, brief_analysis, session_id) or (None, None, None) if failed
         """
-        from rich.console import Console
-        
         console = Console()
         console.print(f"[blue]Creating Devin session to scope issue...[/blue]")
 
-        initial_prompt = f"""Analyze this GitHub issue and provide a quick initial confidence assessment. Please update the structured output immediately when you assign a confidence score and brief_analysis. Use the following format for the structured_output:.
-{{
-  "confidence_level": "High|Medium|Low",
-  "brief_analysis": "2-3 sentence analysis of scope and complexity"
-}}
-
-Issue Title: {issue.get('title', '')}
-Issue Body: {issue.get('body', '') or 'No description provided'}
-Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])}
-
-**INSTRUCTIONS:**
-1. Read the issue carefully
-2. **AS SOON AS you determine your confidence level and scope, IMMEDIATELY update the structured output** with your confidence assessment and brief_analysis
-3. Keep your analysis concise (2-3 sentences maximum)
-4. Do NOT provide detailed analysis yet - just initial assessment
-5. Do NOT create pull requests or implement solutions
-
-**CRITICAL: Update the structured output immediately as soon as you have determined the confidence level and brief scope. Respond as fast as possible.**"""
+        initial_prompt = SCOPING_INITIAL_PROMPT.format(
+            title=issue.get('title', ''),
+            body=issue.get('body', '') or 'No description provided',
+            labels=', '.join([label.get('name', '') for label in issue.get('labels', [])])
+        )
 
         try:
             session = self.create_session(initial_prompt)
@@ -225,26 +212,7 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
                 console.print(f"[red]Failed to extract initial assessment[/red]")
                 return None, None, None
 
-            detailed_analysis_prompt = f"""Now that you've provided the initial assessment, please provide a comprehensive detailed scope analysis using the following structured_output schema:
-{{
-  "detailed_analysis": "Comprehensive detailed scope analysis"
-   "implementation_approach": "Detailed implementation approach"
-  "testing_considerations": "Testing considerations"
-}}
-
-**INSTRUCTIONS FOR DETAILED ANALYSIS:**
-1. Provide a comprehensive detailed scope assessment including:
-   - Detailed implementation approach
-   - Potential challenges and edge cases
-   - Testing considerations
-   - Files/components that need to be modified
-   - Time breakdown by component
-2. **UPDATE the structured output's detailed_scope_analysis field** when you complete the analysis
-3. Do NOT create pull requests or implement solutions
-
-**Take your time to be thorough and comprehensive.**"""
-            
-            self.send_message(session_id, detailed_analysis_prompt)
+            self.send_message(session_id, SCOPING_DETAILED_PROMPT)
 
             return confidence_level, brief_analysis, session_id
 
@@ -263,10 +231,6 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
         Returns:
             Tuple of (confidence_level, brief_analysis) or (None, None) if failed
         """
-        from rich.console import Console
-        from rich.live import Live
-        from rich.spinner import Spinner
-
         console = Console()
         start_time = time.time()
 
@@ -319,10 +283,6 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
         Raises:
             TimeoutError: If detailed scope analysis doesn't become available within timeout
         """
-        from rich.console import Console
-        from rich.live import Live
-        from rich.spinner import Spinner
-
         console = Console()
         start_time = time.time()
         
@@ -370,8 +330,6 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
         Returns:
             Cleaned message content without JSON formatting
         """
-        import json
-        
         if not content or not content.strip():
             return content
         
