@@ -219,7 +219,6 @@ Labels: {', '.join([label.get('name', '') for label in issue.get('labels', [])])
             console.print(f"[green]Created scoping session: {session_id}[/green]")
             console.print(f"[dim]Session URL: {session['url']}[/dim]")
 
-            console.print(f"[blue]Waiting for Devin to assign a confidence score...[/blue]")
             confidence_level, brief_analysis = self._extract_initial_confidence(session_id)
             
             if not confidence_level or not brief_analysis:
